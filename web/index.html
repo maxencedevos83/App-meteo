@@ -70,6 +70,14 @@
       <div id="sea" class="sea"></div>
     </section>
 
+    <section class="card" id="history-card" hidden>
+      <div class="card-head"><h2>Prévu vs réel</h2><span class="hint">48 dernières heures</span></div>
+      <div id="history-stats" class="hero-stats verif"></div>
+      <div id="history" class="chart"></div>
+      <div class="legend"><span><i class="ln fc"></i>prévu (3 à 12 h avant)</span><span><i class="ln ob"></i>mesuré</span></div>
+      <p class="explain" id="history-src"></p>
+    </section>
+
     <section class="card">
       <div class="card-head"><h2>Sources et fiabilité</h2></div>
       <p class="explain" id="explain"></p>
@@ -79,7 +87,7 @@
   </main>
 
   <footer class="foot">
-    Données : Open-Meteo (Météo-France, ECMWF, DWD, KNMI, Met Office, NOAA), Windguru, RainViewer, observations METAR.
+    Données : Open-Meteo (Météo-France, ECMWF, DWD, KNMI, Met Office, NOAA), Windguru, RainViewer, stations Météo-France et METAR.
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>

@@ -119,6 +119,15 @@ main { max-width: 760px; margin: 0 auto; padding: 0 16px; display: grid; gap: 14
 .sea { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .sea .stat { background: color-mix(in srgb, var(--rain) 10%, transparent); }
 
+/* Prévu vs réel */
+.verif { margin: 0 0 10px; }
+.verif .stat { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 4px; }
+.legend .ln { display: inline-block; width: 16px; height: 0; border-top: 2.5px solid; vertical-align: middle; margin-right: 5px; }
+.legend .fc { border-color: var(--accent); border-top-style: dashed; }
+.legend .ob { border-color: var(--warm); }
+#history-src { margin-top: 8px; }
+
 /* Sources */
 .explain { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
 .sources table { width: 100%; border-collapse: collapse; font-size: 13px; }
