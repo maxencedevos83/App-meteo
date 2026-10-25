@@ -1,0 +1,12 @@
+{
+  "place": "Le Lavandou",
+  "latitude": 43.1375,
+  "longitude": 6.3683,
+  "timezone": "Europe/Paris",
+  "windguru": {
+    "spotId": 48633,
+    "search": "Lavandou"
+  },
+  "metar": "LFTH",
+  "siteUrl": "https://maxencedevos83.github.io/App-meteo/"
+}

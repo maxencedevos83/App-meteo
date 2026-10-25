@@ -1,0 +1,12 @@
+{
+  "name": "app-meteo",
+  "private": true,
+  "type": "module",
+  "description": "Météo multi-sources pondérée (Open-Meteo, Météo-France, ECMWF, Windguru, radar RainViewer)",
+  "scripts": {
+    "update": "node scripts/update.mjs",
+    "test": "node --test test/*.test.mjs",
+    "serve": "node scripts/serve.mjs"
+  },
+  "engines": { "node": ">=20" }
+}

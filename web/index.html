@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Météo fiable</title>
+  <meta name="description" content="Prévision combinée de plusieurs modèles (Météo-France, ECMWF, DWD, Windguru…), pondérée par leur justesse locale.">
+  <meta name="theme-color" content="#0f2a44">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <button id="place-btn" class="place" aria-label="Changer de lieu">
+      <span id="place-name">…</span>
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <div class="updated" id="updated"></div>
+    <button id="refresh" class="icon-btn" aria-label="Actualiser">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </header>
+
+  <dialog id="place-dialog">
+    <form method="dialog" class="search">
+      <input id="search-input" type="search" placeholder="Ville, plage, spot…" autocomplete="off">
+      <ul id="search-results"></ul>
+      <div class="dialog-actions">
+        <button type="button" id="home-btn" class="link">Revenir au lieu principal</button>
+        <button value="cancel" class="link">Fermer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <main id="app">
+    <section class="hero card" id="hero" aria-live="polite">
+      <div class="skeleton">Chargement des modèles…</div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>48 prochaines heures</h2><span class="hint">bande = écart entre modèles</span></div>
+      <div id="chart" class="chart"></div>
+      <div id="hourly" class="hourly"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Vent</h2><span class="hint">nœuds · rafales</span></div>
+      <div id="wind" class="wind-table"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Radar pluie</h2><span class="hint" id="radar-time"></span></div>
+      <div id="radar" class="radar"></div>
+      <div class="radar-controls">
+        <button id="radar-play" class="chip">▶ Animer</button>
+        <input id="radar-slider" type="range" min="0" max="0" value="0" aria-label="Heure du radar">
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>10 jours</h2></div>
+      <div id="days" class="days"></div>
+    </section>
+
+    <section class="card" id="sea-card" hidden>
+      <div class="card-head"><h2>Mer</h2></div>
+      <div id="sea" class="sea"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Sources et fiabilité</h2></div>
+      <p class="explain" id="explain"></p>
+      <div id="sources" class="sources"></div>
+      <details class="errors" id="errors" hidden><summary>Avertissements</summary><ul></ul></details>
+    </section>
+  </main>
+
+  <footer class="foot">
+    Données : Open-Meteo (Météo-France, ECMWF, DWD, KNMI, Met Office, NOAA), Windguru, RainViewer, observations METAR.
+  </footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

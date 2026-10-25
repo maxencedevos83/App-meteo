@@ -1,0 +1,75 @@
+name: Mise à jour météo
+
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['web/**', 'scripts/**', 'test/**', 'config.json', '.github/workflows/update.yml']
+  pull_request:
+    paths: ['web/**', 'scripts/**', 'test/**', 'config.json', '.github/workflows/update.yml']
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: meteo-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+  cancel-in-progress: false
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Tests
+        run: npm test
+
+      - name: Récupérer l'état de vérification (branche data)
+        run: |
+          mkdir -p state
+          if git ls-remote --exit-code --heads origin data >/dev/null; then
+            git fetch --depth 1 origin data
+            git archive FETCH_HEAD | tar -x -C state
+          fi
+
+      - name: Calculer la prévision combinée
+        run: |
+          node scripts/update.mjs
+          cat out/data/widget.json
+
+      - name: Sauvegarder l'état de vérification
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd state
+          git init -q -b data
+          git add -A
+          git -c user.name="meteo-bot" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "État de vérification $(date -u +%FT%TZ)"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" data
+
+      - name: Assembler le site
+        run: node scripts/build-site.mjs
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: forecast
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
