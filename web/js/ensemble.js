@@ -30,7 +30,14 @@ export const MODELS = [
 ];
 
 // Windguru : Maxence le trouve très fiable sur son spot, surtout pour le vent.
-export const WINDGURU_PRIOR = { temp: 0.9, wind: 1.6, precip: 0.9, cloud: 0.8 };
+// Poids de l'ensemble des modèles Windguru, partagé entre eux : le spot en propose une vingtaine,
+// souvent des variantes des mêmes modèles globaux, qui sinon écraseraient les autres sources.
+export const WINDGURU_GROUP_PRIOR = { temp: 3.5, wind: 6.5, precip: 3, cloud: 2.5 };
+
+export function windguruPrior(count) {
+  const n = Math.max(1, count);
+  return Object.fromEntries(Object.entries(WINDGURU_GROUP_PRIOR).map(([k, v]) => [k, v / n]));
+}
 
 // Variable de poids pour chaque grandeur combinée.
 const WEIGHT_KEY = { temp: 'temp', feels: 'temp', rh: 'temp', pressure: 'temp', wind: 'wind', gust: 'wind', dir: 'wind', precip: 'precip', code: 'precip', cloud: 'cloud' };

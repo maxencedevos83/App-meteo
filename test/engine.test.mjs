@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { combine, daily, deriveCode, leadFactor, MODELS } from '../web/js/ensemble.js';
+import { combine, daily, deriveCode, leadFactor, MODELS, windguruPrior, WINDGURU_GROUP_PRIOR } from '../web/js/ensemble.js';
 import { fetchAllOpenMeteo } from '../web/js/sources.js';
 import { buildForecast, buildWidget, rainNextHour } from '../web/js/forecast.js';
 import { parseForecast } from '../scripts/windguru.mjs';
@@ -145,4 +145,11 @@ test('vérification : archivage, appariement avec les observations et scores', (
   assert.ok(skill.good.temp.factor > 1 && skill.bad.temp.factor < 1);
   assert.ok(skill.good.temp.bias > 0);
   assert.ok(skill.bad.wind.ratio < 1);
+});
+
+test('Windguru : le poids du groupe est partagé entre ses modèles', () => {
+  const p = windguruPrior(19);
+  assert.ok(Math.abs(p.wind * 19 - WINDGURU_GROUP_PRIOR.wind) < 1e-9);
+  // Le groupe pèse plus lourd pour le vent que pour la température.
+  assert.ok(WINDGURU_GROUP_PRIOR.wind / WINDGURU_GROUP_PRIOR.temp > 1.5);
 });

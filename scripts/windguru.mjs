@@ -1,6 +1,6 @@
 // Windguru : API interne du site (non documentée), appelée côté serveur car elle exige un Referer windguru.cz.
 // Tout est défensif : si Windguru change son format, la source est simplement ignorée.
-import { WINDGURU_PRIOR, localKey } from '../web/js/ensemble.js';
+import { windguruPrior, localKey } from '../web/js/ensemble.js';
 
 const API = 'https://www.windguru.cz/int/iapi.php';
 const HEADERS = {
@@ -124,10 +124,12 @@ export async function fetchWindguru(config) {
     try {
       const json = await call({ q: 'forecast', id_model: String(m.id), rundef: m.rundef, id_spot: String(spotId), WGCACHEABLE: '21600', cachefix: `${config.latitude}x${config.longitude}x0` });
       const parsed = parseForecast(json, m, config.timezone);
-      sources.push({ id: `windguru_${m.id}`, label: `Windguru ${m.name}`, provider: 'Windguru', kind: 'windguru', prior: WINDGURU_PRIOR, ...horizons(m.name), ...parsed });
+      sources.push({ id: `windguru_${m.id}`, label: `Windguru ${m.name}`, provider: 'Windguru', kind: 'windguru', ...horizons(m.name), ...parsed });
     } catch (e) {
       log.push(e.message);
     }
   }
+  const prior = windguruPrior(sources.length);
+  for (const s of sources) s.prior = prior;
   return { spotId, spotName: info.name, sources, log };
 }

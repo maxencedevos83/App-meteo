@@ -4,7 +4,7 @@
   "longitude": 6.3683,
   "timezone": "Europe/Paris",
   "windguru": {
-    "spotId": null,
+    "spotId": 48633,
     "search": "Lavandou"
   },
   "metar": "LFTH",

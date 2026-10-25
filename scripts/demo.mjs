@@ -1,7 +1,7 @@
 // Données fictives pour tester l'interface sans réseau : node scripts/demo.mjs
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { MODELS, WINDGURU_PRIOR, localKey } from '../web/js/ensemble.js';
+import { MODELS, windguruPrior, localKey } from '../web/js/ensemble.js';
 import { buildForecast, buildWidget } from '../web/js/forecast.js';
 
 const root = new URL('..', import.meta.url).pathname;
@@ -11,7 +11,7 @@ const start = localKey(now, config.timezone).slice(0, 14) + '00';
 const times = Array.from({ length: 240 }, (_, i) => new Date(Date.parse(start + ':00Z') + i * 3600000).toISOString().slice(0, 16));
 const rnd = (seed) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 
-const models = [...MODELS, { id: 'windguru_3', label: 'Windguru GFS 13 km', provider: 'Windguru', prior: WINDGURU_PRIOR, short: 48, lead: 240 }];
+const models = [...MODELS, { id: 'windguru_3', label: 'Windguru GFS 13 km', provider: 'Windguru', prior: windguruPrior(1), short: 48, lead: 240 }];
 const sources = models.map((m, k) => {
   const r = rnd(k + 7);
   const off = (r() - 0.5) * 2;

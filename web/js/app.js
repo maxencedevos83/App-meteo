@@ -214,7 +214,7 @@ function renderSources(fc) {
   const verif = fc.scores
     ? ` Les modèles sont comparés en continu aux observations de la station ${esc(fc.scores.station)} (${fc.scores.observations} relevés) : ceux qui se trompent le moins chez toi gagnent du poids, et leurs biais sont corrigés.`
     : '';
-  $('#explain').innerHTML = `Chaque valeur est une moyenne pondérée de ${fc.models.length} modèles. Les modèles fins de Météo-France (AROME) pèsent le plus à courte échéance, ECMWF à plus long terme, et Windguru compte double pour le vent.${verif}`;
+  $('#explain').innerHTML = `Chaque valeur est une moyenne pondérée de ${fc.models.length} modèles. Les modèles fins de Météo-France (AROME) pèsent le plus à courte échéance, ECMWF à plus long terme, et les modèles Windguru pèsent environ 40 % du vent.${verif}`;
   const fmt = (s, k, unit) => (s?.[k] ? `${s[k].mae.toFixed(1)} ${unit}<small>${s[k].n} comp.</small>` : '<small>en cours</small>');
   $('#sources').innerHTML = `<table>
     <tr><th>Modèle</th><th>Poids</th><th class="num">Erreur temp.</th><th class="num">Erreur vent</th></tr>

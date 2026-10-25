@@ -23,7 +23,7 @@ Appli météo qui combine plusieurs modèles de prévision au lieu d'en croire u
 
 ## Comment la prévision est calculée
 
-1. **Moyenne pondérée** de tous les modèles, heure par heure. Chaque modèle a un poids de départ par grandeur (température, vent, pluie, nuages) : AROME pèse le plus à courte échéance, ECMWF à plus long terme, Windguru compte presque double pour le vent.
+1. **Moyenne pondérée** de tous les modèles, heure par heure. Chaque modèle a un poids de départ par grandeur (température, vent, pluie, nuages) : AROME pèse le plus à courte échéance, ECMWF à plus long terme, les modèles Windguru (une vingtaine sur ton spot) se partagent un poids de groupe, environ 40 % du total pour le vent.
 2. **Poids selon l'échéance** : un modèle à maille fine garde son plein poids sur sa période de validité, puis s'efface progressivement.
 3. **Vérification locale** : toutes les 3 h, la prévision de chaque modèle est archivée, puis comparée aux observations de la station de Toulon-Hyères. Un modèle plus juste que la moyenne gagne jusqu'à ×3 en poids, un modèle moins juste descend jusqu'à ×0,3. Les biais (trop chaud, trop venté…) sont corrigés à moitié, car la station n'est pas exactement au Lavandou. L'effet monte progressivement avec le nombre de comparaisons (plein effet après ~150).
 4. **Pluie** : probabilité = part des modèles qui prévoient de la pluie, mélangée à l'ensemble ECMWF.
