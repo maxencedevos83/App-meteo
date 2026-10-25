@@ -3,6 +3,7 @@ import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { MODELS, windguruPrior, localKey } from '../web/js/ensemble.js';
 import { buildForecast, buildWidget } from '../web/js/forecast.js';
+import { buildAlerts } from '../web/js/alerts.js';
 
 const root = new URL('..', import.meta.url).pathname;
 const config = JSON.parse(await readFile(join(root, 'config.json'), 'utf8'));
@@ -39,6 +40,8 @@ fc.history = Array.from({ length: 48 }, (_, i) => {
   const t = 15 + 5 * Math.sin(((+time.slice(11, 13) - 9) / 24) * 2 * Math.PI);
   return { time, obs: { t: t + Math.sin(i) * 0.6, w: 10 + 6 * Math.sin(i / 8), g: null, p: 0 }, fc: i > 3 ? { t: t + 0.4, w: 11 + 5 * Math.sin(i / 8 + 0.3), g: null, p: 0 } : null, src: 'mf' };
 });
+fc.vigilance = [{ type: 'Vent', level: 2, color: 'jaune', onset: '', expires: '', headline: 'Vigilance jaune vent violent jusqu\'à demain 6h' }];
+fc.alerts = buildAlerts(fc, { vigilance: fc.vigilance, gustKn: 25 });
 await mkdir(join(root, 'out', 'data'), { recursive: true });
 await writeFile(join(root, 'out', 'data', 'forecast.json'), JSON.stringify(fc));
 await writeFile(join(root, 'out', 'data', 'widget.json'), JSON.stringify(buildWidget(fc), null, 1));

@@ -82,11 +82,15 @@ export async function fetchNowcast(lat, lon, timeZone, fetchImpl) {
 // État de la mer (vagues, température de l'eau).
 export async function fetchMarine(lat, lon, timeZone, fetchImpl) {
   const url = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&timezone=${encodeURIComponent(timeZone)}`
-    + '&hourly=wave_height,wave_direction,wave_period,sea_surface_temperature&forecast_days=3';
+    + '&hourly=wave_height,wave_direction,wave_period,swell_wave_height,swell_wave_direction,swell_wave_period,wind_wave_height,sea_surface_temperature&forecast_days=6';
   const json = await getJson(url, fetchImpl);
   const h = json.hourly || {};
   if (!h.time) return null;
-  return h.time.map((t, i) => ({ time: t, wave: h.wave_height?.[i], waveDir: h.wave_direction?.[i], period: h.wave_period?.[i], sst: h.sea_surface_temperature?.[i] }));
+  return h.time.map((t, i) => ({
+    time: t, wave: h.wave_height?.[i], waveDir: h.wave_direction?.[i], period: h.wave_period?.[i],
+    swell: h.swell_wave_height?.[i], swellDir: h.swell_wave_direction?.[i], swellPeriod: h.swell_wave_period?.[i],
+    windWave: h.wind_wave_height?.[i], sst: h.sea_surface_temperature?.[i],
+  }));
 }
 
 export async function geocode(query, fetchImpl) {

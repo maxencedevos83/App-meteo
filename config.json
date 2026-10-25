@@ -17,5 +17,10 @@
       "BORMES LES MIMOSAS",
       "ILE DU LEVANT"
     ]
+  },
+  "shoreFacing": 150,
+  "alerts": {
+    "gustKn": 30,
+    "sessionMin": 75
   }
 }

@@ -1,6 +1,7 @@
 import { codeEmoji, codeLabel, dirLabel } from './ensemble.js';
 import { fetchAllOpenMeteo, fetchEnsemblePop, fetchNowcast, fetchMarine, geocode } from './sources.js';
 import { buildForecast } from './forecast.js';
+import { buildAlerts, dayWord } from './alerts.js';
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -34,6 +35,7 @@ async function loadPlace(place) {
   if (!om.sources.length) throw new Error('aucun modèle disponible pour ce lieu');
   const fc = buildForecast({ config: { place: place.name, latitude: lat, longitude: lon, timezone: tz }, sources: om.sources, ensemblePop: pop, nowcast, marine, errors: om.errors });
   fc.local = true;
+  fc.alerts = buildAlerts(fc);
   return fc;
 }
 
@@ -74,10 +76,13 @@ function render(fc) {
   $('#place-name').textContent = fc.place;
   const age = Math.round((Date.now() - Date.parse(fc.generatedAt)) / 60000);
   $('#updated').textContent = age < 1 ? 'à l\'instant' : age < 60 ? `il y a ${age} min` : `il y a ${Math.round(age / 60)} h`;
+  renderAlerts(fc.alerts || []);
   renderHero(fc);
   renderChart(fc.hours.slice(0, 48));
   renderHourly(fc.hours.slice(0, 48));
   renderWind(fc.hours.slice(0, 30));
+  renderSessions(fc);
+  renderModels(fc);
   renderDays(fc.days);
   renderSea(fc.marine);
   renderHistory(fc);
@@ -87,7 +92,10 @@ function render(fc) {
 
 function renderHero(fc) {
   const h = fc.hours[0];
-  const d = fc.days[0] || {};
+  // Tard le soir, min/max des 24 h à venir plutôt que de la fin de journée.
+  const today = fc.hours.filter((x) => x.time.slice(0, 10) === fc.now.slice(0, 10));
+  const span = (today.length < 8 ? fc.hours.slice(0, 24) : today).map((x) => x.temp).filter((t) => t != null);
+  const d = { min: Math.min(...span), max: Math.max(...span) };
   const bars = (fc.rain?.slots || []).map((s) => `<span style="height:${Math.min(22, 2 + (s.precip || 0) * 10)}px" title="${s.time.slice(11)} : ${s.precip} mm"></span>`).join('');
   const banner = fc.local ? '<div class="banner" style="margin-bottom:12px;color:var(--ink)">Lieu secondaire : modèles Open-Meteo seulement (Windguru et vérification locale sont réservés au lieu principal).</div>' : '';
   $('#hero').innerHTML = `${banner}
@@ -198,6 +206,51 @@ function renderDays(days) {
   }).join('');
 }
 
+function renderAlerts(alerts) {
+  $('#alerts').hidden = !alerts.length;
+  $('#alerts').innerHTML = alerts.map((a) => `<div class="alert l${a.level}"><b>${esc(a.title)}</b><small>${esc(a.text || '')}</small></div>`).join('');
+}
+
+function scoreColor(sc) {
+  if (sc >= 75) return 'var(--good)';
+  if (sc >= 50) return 'var(--mid)';
+  if (sc >= 25) return 'color-mix(in srgb, var(--mid) 35%, var(--line))';
+  return 'var(--line)';
+}
+
+function renderSessions(fc) {
+  const acts = fc.activities || [];
+  $('#sessions-card').hidden = !acts.length;
+  $('#sessions').innerHTML = acts.map((a) => {
+    const wins = a.windows.map((w) => `<span class="win ${w.score < 75 ? 'mid' : ''}">${dayWord(w.start, fc.now)} ${+w.start.slice(11, 13)}h–${+w.end.slice(11, 13) + 1}h
+      <small>· ${a.id === 'baignade' || a.id === 'balade' ? `${w.score}/100` : `${w.wind} kn ${w.dir}`}${w.notes.length ? ` · ${esc(w.notes.join(', '))}` : ''}</small></span>`).join('');
+    // Bandeau 5 jours : une case par heure, couleur selon le score.
+    const strip = a.scores.slice(0, 120).map((sc, i) => `<i style="background:${scoreColor(sc)}" title="${fc.hours[i]?.time.slice(5, 13).replace('T', ' ')}h : ${sc}"></i>`).join('');
+    return `<div class="act"><div class="ico">${a.emoji}</div><div class="name">${a.label}</div>
+      <div class="strip">${strip}</div>
+      <div class="wins">${wins || '<span class="none">Pas de bon créneau dans les 5 jours</span>'}</div></div>`;
+  }).join('');
+}
+
+function renderModels(fc) {
+  // Les modèles Windguru sont regroupés par famille (GFS, ICON…) pour rester lisibles : on garde les mieux pondérés.
+  const models = fc.models.filter((m) => m.wind?.length).slice(0, 12);
+  const idx = [];
+  for (let i = 0; i < Math.min(48, fc.hours.length); i += 3) idx.push(i);
+  const head = idx.map((i) => {
+    const t = fc.hours[i].time;
+    return `<td>${+t.slice(11, 13) === 0 || i === 0 ? `<b>${dayWord(t, fc.now).slice(0, 3)}</b> ` : ''}${+t.slice(11, 13)}h</td>`;
+  }).join('');
+  const row = (label, vals) => `<tr><th>${esc(label)}</th>${idx.map((i) => {
+    const v = vals[i];
+    return `<td style="background:${windColor(v)};color:#111">${r0(v)}</td>`;
+  }).join('')}</tr>`;
+  $('#models-cmp').innerHTML = `<table><tr><th></th>${head}</tr>
+    ${row('Combiné', fc.hours.map((h) => h.wind))}
+    ${models.map((m) => row(m.label.replace('Windguru ', 'WG '), m.wind)).join('')}
+  </table>`;
+}
+
 function renderSea(marine) {
   const m = marine?.find((x) => x.wave != null || x.sst != null);
   $('#sea-card').hidden = !m;
@@ -206,7 +259,24 @@ function renderSea(marine) {
   $('#sea').innerHTML = `
     <div class="stat"><small>Eau</small><b>${m.sst != null ? `${m.sst.toFixed(1)}°` : '–'}</b></div>
     <div class="stat"><small>Vagues</small><b>${m.wave != null ? `${m.wave.toFixed(1)} m` : '–'}</b><small>${m.period ? `${Math.round(m.period)} s · ` : ''}${dirLabel(m.waveDir)}</small></div>
-    <div class="stat"><small>Max 24 h</small><b>${maxWave.toFixed(1)} m</b></div>`;
+    <div class="stat"><small>Houle</small><b>${m.swell != null ? `${m.swell.toFixed(1)} m` : '–'}</b><small>${m.swellPeriod ? `${Math.round(m.swellPeriod)} s · ` : ''}${dirLabel(m.swellDir)} · max 24 h ${maxWave.toFixed(1)} m</small></div>`;
+  // Par jour : vagues max, houle, température de l'eau.
+  const byDay = new Map();
+  for (const x of marine) {
+    const d = x.time.slice(0, 10);
+    if (!byDay.has(d)) byDay.set(d, []);
+    byDay.get(d).push(x);
+  }
+  const days = [...byDay.entries()].slice(0, 6);
+  const max = (xs, k) => Math.max(...xs.map((x) => x[k] ?? 0));
+  const avg = (xs, k) => { const v = xs.map((x) => x[k]).filter((y) => y != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const cell = (v, d = 1) => `<td>${v == null ? '–' : v.toFixed(d)}</td>`;
+  $('#sea-days').innerHTML = `<table>
+    <tr><th></th>${days.map(([d]) => `<td><b>${FR_DAYS[new Date(d + 'T12:00Z').getUTCDay()]}</b></td>`).join('')}</tr>
+    <tr><th>Vagues max</th>${days.map(([, xs]) => cell(max(xs, 'wave'))).join('')}</tr>
+    <tr><th>Houle max</th>${days.map(([, xs]) => cell(max(xs, 'swell'))).join('')}</tr>
+    <tr><th>Eau</th>${days.map(([, xs]) => cell(avg(xs, 'sst'))).join('')}</tr>
+  </table>`;
 }
 
 // Deux courbes (prévu / mesuré) pour une grandeur sur les dernières heures.

@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/icon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="38sp"
+            android:text="⛅" />
+
+        <TextView
+            android:id="@+id/temp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:fontFamily="sans-serif-light"
+            android:textColor="#FFFFFF"
+            android:textSize="42sp"
+            android:text="--°" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="end"
+            android:orientation="vertical">
+            <TextView android:id="@+id/place" style="@style/WText" android:textStyle="bold" android:text="Météo fiable" />
+            <TextView android:id="@+id/cond" style="@style/WText" android:text="Chargement…" />
+            <TextView android:id="@+id/minmax" style="@style/WSmall" android:text="" />
+            <TextView android:id="@+id/wind" style="@style/WText" android:textStyle="bold" android:text="" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/alert"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/alert_bg"
+        android:paddingStart="8dp"
+        android:paddingTop="3dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="3dp"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:visibility="gone"
+        android:text="" />
+
+    <TextView
+        android:id="@+id/rain"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/chip_bg"
+        android:paddingStart="8dp"
+        android:paddingTop="3dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="3dp"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:text="" />
+
+    <LinearLayout
+        android:id="@+id/hours"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+            <TextView android:id="@+id/h0_t" style="@style/WSmall" android:text="" />
+            <TextView android:id="@+id/h0_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="18sp" android:text="·" />
+            <TextView android:id="@+id/h0_temp" style="@style/WBold" android:text="" />
+            <TextView android:id="@+id/h0_wind" style="@style/WWind" android:text="" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+            <TextView android:id="@+id/h1_t" style="@style/WSmall" android:text="" />
+            <TextView android:id="@+id/h1_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="18sp" android:text="·" />
+            <TextView android:id="@+id/h1_temp" style="@style/WBold" android:text="" />
+            <TextView android:id="@+id/h1_wind" style="@style/WWind" android:text="" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+            <TextView android:id="@+id/h2_t" style="@style/WSmall" android:text="" />
+            <TextView android:id="@+id/h2_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="18sp" android:text="·" />
+            <TextView android:id="@+id/h2_temp" style="@style/WBold" android:text="" />
+            <TextView android:id="@+id/h2_wind" style="@style/WWind" android:text="" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+            <TextView android:id="@+id/h3_t" style="@style/WSmall" android:text="" />
+            <TextView android:id="@+id/h3_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="18sp" android:text="·" />
+            <TextView android:id="@+id/h3_temp" style="@style/WBold" android:text="" />
+            <TextView android:id="@+id/h3_wind" style="@style/WWind" android:text="" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+            <TextView android:id="@+id/h4_t" style="@style/WSmall" android:text="" />
+            <TextView android:id="@+id/h4_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="18sp" android:text="·" />
+            <TextView android:id="@+id/h4_temp" style="@style/WBold" android:text="" />
+            <TextView android:id="@+id/h4_wind" style="@style/WWind" android:text="" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+            <TextView android:id="@+id/h5_t" style="@style/WSmall" android:text="" />
+            <TextView android:id="@+id/h5_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="18sp" android:text="·" />
+            <TextView android:id="@+id/h5_temp" style="@style/WBold" android:text="" />
+            <TextView android:id="@+id/h5_wind" style="@style/WWind" android:text="" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/chart"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:minHeight="60dp"
+        android:layout_marginTop="6dp"
+        android:scaleType="fitXY"
+        android:contentDescription="Vent et pluie sur 24 h" />
+
+    <LinearLayout
+        android:id="@+id/days"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+            <TextView android:id="@+id/d0_t" style="@style/WSmall" android:text="" />
+            <TextView android:id="@+id/d0_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="18sp" android:text="·" />
+            <TextView android:id="@+id/d0_temp" style="@style/WBold" android:text="" />
+            <TextView android:id="@+id/d0_wind" style="@style/WWind" android:text="" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+            <TextView android:id="@+id/d1_t" style="@style/WSmall" android:text="" />
+            <TextView android:id="@+id/d1_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="18sp" android:text="·" />
+            <TextView android:id="@+id/d1_temp" style="@style/WBold" android:text="" />
+            <TextView android:id="@+id/d1_wind" style="@style/WWind" android:text="" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+            <TextView android:id="@+id/d2_t" style="@style/WSmall" android:text="" />
+            <TextView android:id="@+id/d2_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="18sp" android:text="·" />
+            <TextView android:id="@+id/d2_temp" style="@style/WBold" android:text="" />
+            <TextView android:id="@+id/d2_wind" style="@style/WWind" android:text="" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+            <TextView android:id="@+id/d3_t" style="@style/WSmall" android:text="" />
+            <TextView android:id="@+id/d3_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="18sp" android:text="·" />
+            <TextView android:id="@+id/d3_temp" style="@style/WBold" android:text="" />
+            <TextView android:id="@+id/d3_wind" style="@style/WWind" android:text="" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+            <TextView android:id="@+id/d4_t" style="@style/WSmall" android:text="" />
+            <TextView android:id="@+id/d4_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="18sp" android:text="·" />
+            <TextView android:id="@+id/d4_temp" style="@style/WBold" android:text="" />
+            <TextView android:id="@+id/d4_wind" style="@style/WWind" android:text="" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/sessions"
+        style="@style/WSmall"
+        android:layout_width="match_parent"
+        android:layout_marginTop="4dp"
+        android:maxLines="2"
+        android:singleLine="false"
+        android:text="" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:orientation="horizontal">
+        <TextView
+            android:id="@+id/footer"
+            style="@style/WSmall"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:text="" />
+        <TextView
+            android:id="@+id/refresh"
+            style="@style/WSmall"
+            android:paddingStart="10dp"
+            android:text="⟳" />
+    </LinearLayout>
+</LinearLayout>
