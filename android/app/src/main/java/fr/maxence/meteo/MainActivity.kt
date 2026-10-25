@@ -7,7 +7,9 @@ import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
+import android.os.Build
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -45,13 +47,28 @@ class MainActivity : Activity() {
             setOnClickListener { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(MeteoData.siteUrl(this@MainActivity)))) }
         }
         status = TextView(this).apply { setPadding(0, pad, 0, 0) }
+        val notifTitle = TextView(this).apply { text = "Notifications"; textSize = 18f; setPadding(0, pad, 0, pad / 3) }
+        val toggles = Notifier.TYPES.map { (key, labelText, _) ->
+            CheckBox(this).apply {
+                text = labelText
+                isChecked = Notifier.enabled(this@MainActivity, key)
+                setOnCheckedChangeListener { _, on -> Notifier.setEnabled(this@MainActivity, key, on) }
+            }
+        }
 
-        setContentView(LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.TOP
-            setPadding(pad, pad * 2, pad, pad)
-            listOf(title, help, label, url, save, open, status).forEach { addView(it) }
+        setContentView(android.widget.ScrollView(this).apply {
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.TOP
+                setPadding(pad, pad * 2, pad, pad)
+                (listOf(title, help, label, url, save, open, notifTitle) + toggles + status).forEach { addView(it) }
+            })
         })
+
+        // Android 13+ : autorisation nécessaire pour afficher les notifications.
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
+        }
 
         // Ouvert depuis l'ajout d'un widget : on valide tout de suite la configuration.
         val widgetId = intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
@@ -68,6 +85,7 @@ class MainActivity : Activity() {
             val data = MeteoData.refresh(this)
             MeteoWidget.render(this, data)
             val error = MeteoData.lastError(this)
+            if (error == null) Notifier.notifyNew(this, data)
             runOnUiThread {
                 status.text = when {
                     data == null -> "Impossible de récupérer la prévision : $error"

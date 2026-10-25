@@ -36,6 +36,8 @@
   </dialog>
 
   <main id="app">
+    <section id="alerts" class="alerts" hidden aria-live="polite"></section>
+
     <section class="hero card" id="hero" aria-live="polite">
       <div class="skeleton">Chargement des modèles…</div>
     </section>
@@ -49,6 +51,16 @@
     <section class="card">
       <div class="card-head"><h2>Vent</h2><span class="hint">nœuds · rafales</span></div>
       <div id="wind" class="wind-table"></div>
+    </section>
+
+    <section class="card" id="sessions-card">
+      <div class="card-head"><h2>Sorties</h2><span class="hint">meilleurs créneaux sur 5 jours</span></div>
+      <div id="sessions" class="sessions"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Vent par modèle</h2><span class="hint">nœuds, toutes les 3 h</span></div>
+      <div id="models-cmp" class="wind-table"></div>
     </section>
 
     <section class="card">
@@ -68,6 +80,7 @@
     <section class="card" id="sea-card" hidden>
       <div class="card-head"><h2>Mer</h2></div>
       <div id="sea" class="sea"></div>
+      <div id="sea-days" class="wind-table sea-days"></div>
     </section>
 
     <section class="card" id="history-card" hidden>

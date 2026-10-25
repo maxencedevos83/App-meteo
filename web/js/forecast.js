@@ -1,5 +1,6 @@
 // Assemble la prévision finale (appli) et le résumé compact (widgets).
 import { combine, daily, codeLabel, codeEmoji, dirLabel, localKey } from './ensemble.js';
+import { buildActivities } from './activities.js';
 
 const r1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
 const r0 = (v) => (v == null ? null : Math.round(v));
@@ -52,6 +53,8 @@ export function buildForecast({ config, sources, ensemblePop = {}, nowcast = nul
     };
   }).sort((a, b) => b.weight - a.weight);
 
+  const seaHours = marine ? marine.filter((m) => m.time >= nowKey.slice(0, 13) + ':00').slice(0, 120) : null;
+
   return {
     generatedAt: now.toISOString(),
     place: config.place,
@@ -67,7 +70,8 @@ export function buildForecast({ config, sources, ensemblePop = {}, nowcast = nul
       code: h.code, isDay: h.isDay, confidence: h.confidence, n: h.n,
     })),
     days: days.map((d) => ({ ...d, min: r1(d.min), max: r1(d.max), precip: r1(d.precip), pop: r0(d.pop * 100), wind: r0(d.wind), gust: r0(d.gust), dir: r0(d.dir) })),
-    marine: marine ? marine.filter((m) => m.time >= nowKey.slice(0, 13) + ':00').slice(0, 48) : null,
+    marine: seaHours,
+    activities: buildActivities(hours, seaHours, config.shoreFacing ?? 180),
     models,
     scores,
     errors,
@@ -87,6 +91,14 @@ export function buildWidget(fc) {
     nextHours.push({ t: `${+h.time.slice(11, 13)}h`, temp: r0(h.temp), icon: codeEmoji(h.code, h.isDay), pop: h.pop ?? 0, wind: h.wind, gust: h.gust, dir: dirLabel(h.dir), dirDeg: h.dir });
   }
   const label = (i) => (i === 0 ? 'Auj.' : i === 1 ? 'Dem.' : dayName(fc.days[i].date));
+  // Tard le soir, la journée en cours n'a presque plus d'heures : min/max sur les 24 h à venir.
+  const remaining = fc.hours.filter((h) => h.time.slice(0, 10) === fc.now.slice(0, 10)).length;
+  const span = remaining < 8 ? fc.hours.slice(0, 24) : fc.hours.filter((h) => h.time.slice(0, 10) === fc.now.slice(0, 10));
+  const temps = span.map((h) => h.temp).filter((t) => t != null);
+  const whenLabel = (w) => {
+    const i = fc.days.findIndex((d) => d.date === w.start.slice(0, 10));
+    return `${i >= 0 ? label(i) : ''} ${+w.start.slice(11, 13)}h–${+w.end.slice(11, 13) + 1}h`.trim();
+  };
   return {
     place: fc.place,
     updated: fc.now.slice(11, 16).replace(':', 'h'),
@@ -102,13 +114,20 @@ export function buildWidget(fc) {
     dirDeg: cur.dir,
     pop: cur.pop ?? 0,
     rain: fc.rain?.text || '',
-    min: r0(today.min),
-    max: r0(today.max),
+    min: temps.length ? r0(Math.min(...temps)) : r0(today.min),
+    max: temps.length ? r0(Math.max(...temps)) : r0(today.max),
     confidence: cur.confidence,
     sea: fc.marine?.[0]?.sst != null ? r0(fc.marine[0].sst) : null,
     wave: fc.marine?.[0]?.wave != null ? r1(fc.marine[0].wave) : null,
     sources: fc.models.filter((m) => m.weight > 0).length,
     h: nextHours,
     d: fc.days.slice(0, 5).map((d, i) => ({ day: label(i), min: r0(d.min), max: r0(d.max), icon: codeEmoji(d.code, true), pop: d.pop, wind: d.wind, gust: d.gust })),
+    // 24 prochaines heures pour le graphe du grand widget.
+    chart: fc.hours.slice(0, 24).map((h) => ({ h: +h.time.slice(11, 13), temp: r1(h.temp), wind: h.wind, gust: h.gust, dir: h.dir, pop: h.pop ?? 0, precip: h.precip ?? 0 })),
+    alerts: fc.alerts || [],
+    sessions: (fc.activities || []).filter((a) => a.windows.length).map((a) => {
+      const w = a.windows.find((x) => x.end >= fc.now.slice(0, 13) + ':00') || a.windows[0];
+      return { id: a.id, emoji: a.emoji, label: a.label, when: whenLabel(w), score: w.score, wind: w.wind, gust: w.gust, dir: w.dir };
+    }),
   };
 }

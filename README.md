@@ -35,6 +35,17 @@ Appli météo qui combine plusieurs modèles de prévision au lieu d'en croire u
 
 L'onglet « Sources et fiabilité » de l'appli montre le poids réel de chaque modèle et son erreur moyenne mesurée.
 
+## Alertes, sorties et mer
+
+- **Alertes** (bandeau de l'appli, et notifications du widget Android, réglables dans l'appli du widget) : vigilance Météo-France du Var (flux public MeteoAlarm), pluie dans l'heure, orage, coup de vent (rafales ≥ 30 kn sur 12 h, réglable dans `config.json` → `alerts.gustKn`), bons créneaux de sortie.
+- **Sorties** : score heure par heure sur 5 jours et meilleurs créneaux pour kite/wing, voile, paddle/kayak, baignade et balade. Le score tient compte du vent, des rafales, de l'orientation de la plage (`shoreFacing`, 150° pour Le Lavandou : un vent de terre est pénalisé pour le kite et le paddle), des vagues, de la température de l'eau, de la pluie et de la nuit. Les seuils sont dans `web/js/activities.js`.
+- **Mer** : vagues, houle (hauteur, période, direction) et température de l'eau sur 6 jours.
+- **Vent par modèle** : tableau façon Windguru qui compare les modèles toutes les 3 h.
+
+## Widget Android
+
+Le widget s'adapte à sa taille : **petit** (température, vent, pluie), **moyen** (prochaines heures et alerte principale), **grand** (en plus : graphe vent/rafales/pluie/température sur 24 h, 5 jours et prochains créneaux de sortie). Redimensionne-le par appui long.
+
 ## Fonctionnement technique
 
 - `scripts/update.mjs` tourne toutes les 30 min dans GitHub Actions (`.github/workflows/update.yml`). Il récupère toutes les sources, calcule la prévision, met à jour l'état de vérification (branche `data`) et publie le site sur GitHub Pages avec `data/forecast.json` et `data/widget.json`.

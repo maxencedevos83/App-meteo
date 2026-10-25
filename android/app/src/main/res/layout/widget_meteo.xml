@@ -44,6 +44,24 @@
     </LinearLayout>
 
     <TextView
+        android:id="@+id/alert"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/alert_bg"
+        android:paddingStart="8dp"
+        android:paddingTop="3dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="3dp"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:visibility="gone"
+        android:text="" />
+
+    <TextView
         android:id="@+id/rain"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -55,6 +73,8 @@
         android:paddingBottom="3dp"
         android:textColor="#FFFFFF"
         android:textSize="12sp"
+        android:maxLines="1"
+        android:ellipsize="end"
         android:text="" />
 
     <LinearLayout
@@ -69,10 +89,10 @@
             android:layout_weight="1"
             android:gravity="center_horizontal"
             android:orientation="vertical">
-            <TextView android:id="@+id/h0_t" style="@style/WSmall" android:text="--h" />
+            <TextView android:id="@+id/h0_t" style="@style/WSmall" android:text="" />
             <TextView android:id="@+id/h0_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="18sp" android:text="·" />
-            <TextView android:id="@+id/h0_temp" style="@style/WText" android:textStyle="bold" android:text="--°" />
-            <TextView android:id="@+id/h0_wind" style="@style/WWind" android:text="--" />
+            <TextView android:id="@+id/h0_temp" style="@style/WBold" android:text="" />
+            <TextView android:id="@+id/h0_wind" style="@style/WWind" android:text="" />
         </LinearLayout>
         <LinearLayout
             android:layout_width="0dp"
@@ -80,10 +100,10 @@
             android:layout_weight="1"
             android:gravity="center_horizontal"
             android:orientation="vertical">
-            <TextView android:id="@+id/h1_t" style="@style/WSmall" android:text="--h" />
+            <TextView android:id="@+id/h1_t" style="@style/WSmall" android:text="" />
             <TextView android:id="@+id/h1_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="18sp" android:text="·" />
-            <TextView android:id="@+id/h1_temp" style="@style/WText" android:textStyle="bold" android:text="--°" />
-            <TextView android:id="@+id/h1_wind" style="@style/WWind" android:text="--" />
+            <TextView android:id="@+id/h1_temp" style="@style/WBold" android:text="" />
+            <TextView android:id="@+id/h1_wind" style="@style/WWind" android:text="" />
         </LinearLayout>
         <LinearLayout
             android:layout_width="0dp"
@@ -91,10 +111,10 @@
             android:layout_weight="1"
             android:gravity="center_horizontal"
             android:orientation="vertical">
-            <TextView android:id="@+id/h2_t" style="@style/WSmall" android:text="--h" />
+            <TextView android:id="@+id/h2_t" style="@style/WSmall" android:text="" />
             <TextView android:id="@+id/h2_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="18sp" android:text="·" />
-            <TextView android:id="@+id/h2_temp" style="@style/WText" android:textStyle="bold" android:text="--°" />
-            <TextView android:id="@+id/h2_wind" style="@style/WWind" android:text="--" />
+            <TextView android:id="@+id/h2_temp" style="@style/WBold" android:text="" />
+            <TextView android:id="@+id/h2_wind" style="@style/WWind" android:text="" />
         </LinearLayout>
         <LinearLayout
             android:layout_width="0dp"
@@ -102,10 +122,10 @@
             android:layout_weight="1"
             android:gravity="center_horizontal"
             android:orientation="vertical">
-            <TextView android:id="@+id/h3_t" style="@style/WSmall" android:text="--h" />
+            <TextView android:id="@+id/h3_t" style="@style/WSmall" android:text="" />
             <TextView android:id="@+id/h3_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="18sp" android:text="·" />
-            <TextView android:id="@+id/h3_temp" style="@style/WText" android:textStyle="bold" android:text="--°" />
-            <TextView android:id="@+id/h3_wind" style="@style/WWind" android:text="--" />
+            <TextView android:id="@+id/h3_temp" style="@style/WBold" android:text="" />
+            <TextView android:id="@+id/h3_wind" style="@style/WWind" android:text="" />
         </LinearLayout>
         <LinearLayout
             android:layout_width="0dp"
@@ -113,10 +133,10 @@
             android:layout_weight="1"
             android:gravity="center_horizontal"
             android:orientation="vertical">
-            <TextView android:id="@+id/h4_t" style="@style/WSmall" android:text="--h" />
+            <TextView android:id="@+id/h4_t" style="@style/WSmall" android:text="" />
             <TextView android:id="@+id/h4_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="18sp" android:text="·" />
-            <TextView android:id="@+id/h4_temp" style="@style/WText" android:textStyle="bold" android:text="--°" />
-            <TextView android:id="@+id/h4_wind" style="@style/WWind" android:text="--" />
+            <TextView android:id="@+id/h4_temp" style="@style/WBold" android:text="" />
+            <TextView android:id="@+id/h4_wind" style="@style/WWind" android:text="" />
         </LinearLayout>
         <LinearLayout
             android:layout_width="0dp"
@@ -124,10 +144,10 @@
             android:layout_weight="1"
             android:gravity="center_horizontal"
             android:orientation="vertical">
-            <TextView android:id="@+id/h5_t" style="@style/WSmall" android:text="--h" />
+            <TextView android:id="@+id/h5_t" style="@style/WSmall" android:text="" />
             <TextView android:id="@+id/h5_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="18sp" android:text="·" />
-            <TextView android:id="@+id/h5_temp" style="@style/WText" android:textStyle="bold" android:text="--°" />
-            <TextView android:id="@+id/h5_wind" style="@style/WWind" android:text="--" />
+            <TextView android:id="@+id/h5_temp" style="@style/WBold" android:text="" />
+            <TextView android:id="@+id/h5_wind" style="@style/WWind" android:text="" />
         </LinearLayout>
     </LinearLayout>
 
@@ -141,6 +161,7 @@
             style="@style/WSmall"
             android:layout_width="0dp"
             android:layout_weight="1"
+            android:ellipsize="end"
             android:text="" />
         <TextView
             android:id="@+id/refresh"

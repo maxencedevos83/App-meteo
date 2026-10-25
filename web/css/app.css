@@ -119,6 +119,31 @@ main { max-width: 760px; margin: 0 auto; padding: 0 16px; display: grid; gap: 14
 .sea { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .sea .stat { background: color-mix(in srgb, var(--rain) 10%, transparent); }
 
+/* Alertes */
+.alerts { display: grid; gap: 8px; }
+.alert { border-radius: 12px; padding: 10px 12px; background: var(--card); border-left: 5px solid var(--accent); box-shadow: 0 1px 2px rgb(0 0 0 / 6%); }
+.alert b { display: block; }
+.alert small { color: var(--muted); }
+.alert.l1 { border-color: var(--rain); }
+.alert.l2 { border-color: #f2c200; }
+.alert.l3 { border-color: #f08c00; }
+.alert.l4 { border-color: #e03131; }
+.alert.l0 { border-color: var(--good); }
+
+/* Sorties */
+.sessions { display: grid; gap: 10px; }
+.act { display: grid; grid-template-columns: 34px 1fr; gap: 4px 10px; align-items: start; }
+.act .ico { font-size: 24px; line-height: 1.2; }
+.act .name { font-weight: 600; }
+.act .wins { display: flex; flex-wrap: wrap; gap: 6px; grid-column: 2; }
+.act .none { color: var(--muted); font-size: 13px; }
+.win { border-radius: 10px; padding: 4px 9px; font-size: 13px; background: color-mix(in srgb, var(--good) 14%, transparent); }
+.win.mid { background: color-mix(in srgb, var(--mid) 18%, transparent); }
+.win small { color: var(--muted); }
+.strip { grid-column: 2; display: flex; height: 8px; border-radius: 4px; overflow: hidden; }
+.strip i { flex: 1; }
+.sea-days { margin-top: 10px; }
+
 /* Prévu vs réel */
 .verif { margin: 0 0 10px; }
 .verif .stat { background: color-mix(in srgb, var(--accent) 10%, transparent); }

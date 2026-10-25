@@ -8,6 +8,8 @@ import { buildForecast, buildWidget } from '../web/js/forecast.js';
 import { fetchWindguru } from './windguru.mjs';
 import { fetchMetar, mergeObs, archiveRun, computeSkill, history, BLEND_ID } from './verify.mjs';
 import { fetchStationObs } from './stations.mjs';
+import { fetchVigilance } from './vigilance.mjs';
+import { buildAlerts } from '../web/js/alerts.js';
 
 const root = new URL('..', import.meta.url).pathname;
 const STATE_DIR = process.env.STATE_DIR || join(root, 'state');
@@ -24,13 +26,14 @@ const nowKey = localKey(now, tz);
 const errors = [];
 const soft = (label) => (e) => { errors.push(`${label} : ${e.message}`); return null; };
 
-const [om, ensemblePop, nowcast, marine, wg, metar] = await Promise.all([
+const [om, ensemblePop, nowcast, marine, wg, metar, vigilance] = await Promise.all([
   fetchAllOpenMeteo(lat, lon, tz),
   fetchEnsemblePop(lat, lon, tz).catch(soft('Ensemble ECMWF')),
   fetchNowcast(lat, lon, tz).catch(soft('Pluie dans l\'heure')),
   fetchMarine(lat, lon, tz).catch(soft('Mer')),
   fetchWindguru(config).catch(soft('Windguru')),
   config.metar ? fetchMetar(config.metar, tz).catch(soft(`METAR ${config.metar}`)) : null,
+  fetchVigilance(config, now).catch(soft('Vigilance Météo-France')),
 ]);
 errors.push(...om.errors);
 if (wg) errors.push(...wg.log);
@@ -82,6 +85,8 @@ const blend = { id: BLEND_ID, times: fc.hours.map((h) => h.time), data: {
 } };
 archiveRun(state, sources, nowKey, [blend]);
 if (wg) fc.windguru = { spotId: wg.spotId, spotName: wg.spotName, models: wg.sources.length };
+fc.vigilance = vigilance;
+fc.alerts = buildAlerts(fc, { gustKn: config.alerts?.gustKn ?? 30, sessionMin: config.alerts?.sessionMin ?? 75, vigilance: vigilance || [] });
 const widget = buildWidget(fc);
 
 await mkdir(OUT_DIR, { recursive: true });
@@ -97,4 +102,7 @@ if (mf?.stations) console.log(`Stations Météo-France : ${mf.stations.map((s) =
 if (mf?.url) console.log(`Fichier : ${mf.url}`);
 const b = fc.scores.blend;
 if (b.temp) console.log(`Justesse de l'appli : temp. ±${b.temp.mae}°, vent ±${b.wind?.mae ?? '?'} kn (${b.temp.n} comparaisons)`);
+console.log(`Vigilance : ${vigilance ? (vigilance.length ? vigilance.map((v) => `${v.color} ${v.type}`).join(', ') : 'aucune') : 'indisponible'}`);
+console.log(`Alertes : ${fc.alerts.map((a) => a.title).join(' | ') || 'aucune'}`);
+for (const a of fc.activities) console.log(`${a.label} : ${a.windows.map((w) => `${w.start.slice(5, 13)}h ×${w.hours} (${w.score})`).join(', ') || '—'}`);
 if (errors.length) console.log('Avertissements :\n- ' + errors.join('\n- '));
