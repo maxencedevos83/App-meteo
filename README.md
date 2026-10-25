@@ -19,13 +19,17 @@ Appli météo qui combine plusieurs modèles de prévision au lieu d'en croire u
 | Open-Meteo 15 min (AROME) | Pluie dans l'heure |
 | RainViewer | Radar de pluie animé |
 | Open-Meteo Marine | Vagues et température de l'eau |
-| METAR Toulon-Hyères (LFTH) | Observations réelles pour vérifier les modèles |
+| Stations Météo-France du Var (open data, data.gouv.fr) | Mesures horaires des stations les plus proches du Lavandou pour vérifier les modèles (température, vent, rafales, pluie) |
+| METAR Toulon-Hyères (LFTH) | Mesures en temps réel de l'aéroport, en complément |
 
 ## Comment la prévision est calculée
 
 1. **Moyenne pondérée** de tous les modèles, heure par heure. Chaque modèle a un poids de départ par grandeur (température, vent, pluie, nuages) : AROME pèse le plus à courte échéance, ECMWF à plus long terme, les modèles Windguru (une vingtaine sur ton spot) se partagent un poids de groupe, environ 40 % du total pour le vent.
 2. **Poids selon l'échéance** : un modèle à maille fine garde son plein poids sur sa période de validité, puis s'efface progressivement.
-3. **Vérification locale** : toutes les 3 h, la prévision de chaque modèle est archivée, puis comparée aux observations de la station de Toulon-Hyères. Un modèle plus juste que la moyenne gagne jusqu'à ×3 en poids, un modèle moins juste descend jusqu'à ×0,3. Les biais (trop chaud, trop venté…) sont corrigés à moitié, car la station n'est pas exactement au Lavandou. L'effet monte progressivement avec le nombre de comparaisons (plein effet après ~150).
+3. **Vérification locale** : toutes les 3 h, la prévision de chaque modèle est archivée, puis comparée aux mesures des stations Météo-France les plus proches (moyenne pondérée par la distance, rayon 20 km), complétées par l'aéroport de Toulon-Hyères. Un modèle plus juste que la moyenne gagne jusqu'à ×3 en poids, un modèle moins juste descend jusqu'à ×0,3. Les biais (trop chaud, trop venté…) sont corrigés à moitié, car la station n'est pas exactement au Lavandou. L'effet monte progressivement avec le nombre de comparaisons (plein effet après ~150).
+   - Les corrections sont aussi apprises **par régime de vent** (secteur nord, est, sud, ouest du vent prévu) : un modèle peut sous-estimer le mistral mais surestimer le vent d'est.
+   - Les **rafales** ont leur propre correction, et la **pluie** est vérifiée heure par heure (pluie / pas de pluie) pour pondérer les modèles sur la pluie.
+   - La prévision combinée est elle-même archivée : l'écran « Prévu vs réel » montre son erreur réelle face au meilleur modèle.
 4. **Pluie** : probabilité = part des modèles qui prévoient de la pluie, mélangée à l'ensemble ECMWF.
 5. **Fiabilité** : indice de 0 à 100 % selon l'accord entre modèles (température, vent, pluie) et l'échéance. Une fiabilité basse signifie que les modèles divergent : à vérifier plus tard.
 

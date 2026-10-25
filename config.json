@@ -8,5 +8,10 @@
     "search": "Lavandou"
   },
   "metar": "LFTH",
-  "siteUrl": "https://maxencedevos83.github.io/App-meteo/"
+  "siteUrl": "https://maxencedevos83.github.io/App-meteo/",
+  "stations": {
+    "departement": "83",
+    "radiusKm": 20,
+    "max": 4
+  }
 }

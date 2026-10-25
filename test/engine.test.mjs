@@ -153,3 +153,15 @@ test('Windguru : le poids du groupe est partagé entre ses modèles', () => {
   // Le groupe pèse plus lourd pour le vent que pour la température.
   assert.ok(WINDGURU_GROUP_PRIOR.wind / WINDGURU_GROUP_PRIOR.temp > 1.5);
 });
+
+test('corrections par régime de vent : le secteur prévu choisit la correction', () => {
+  const west = src('m', {}, [20], { dir: 270, wind: 10 });
+  const east = src('m', {}, [20], { dir: 90, wind: 10 });
+  const skill = { m: { temp: { bias: 0 }, wind: { ratio: 1 }, sectors: { O: { bias: 2, ratio: 1.5 } } } };
+  const w = combine([west], { now: '2026-10-25T10:00', skill }).hours[0];
+  const e = combine([east], { now: '2026-10-25T10:00', skill }).hours[0];
+  assert.equal(w.temp, 18);
+  assert.equal(w.wind, 15);
+  assert.equal(e.temp, 20);
+  assert.equal(e.wind, 10);
+});

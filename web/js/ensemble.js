@@ -55,11 +55,23 @@ export function leadFactor(source, leadHours) {
 }
 
 // Corrections issues de la vérification locale (voir scripts/verify.mjs).
-// skill[model][var] = { factor, bias, ratio }
-function corrected(value, varName, sk) {
+// skill[model] = { temp: { factor, bias }, wind: { factor, ratio, gustRatio }, precip: { factor },
+//                  sectors: { N|E|S|O: { bias, ratio } } } ; le secteur est celui du vent prévu par le modèle.
+const SECTORS = ['N', 'E', 'S', 'O'];
+export const sectorOf = (deg) => (isNum(deg) ? SECTORS[Math.round((((deg % 360) + 360) % 360) / 90) % 4] : null);
+
+function corrected(value, varName, sk, dir) {
   if (!isNum(value) || !sk) return value;
-  if ((varName === 'temp' || varName === 'feels') && sk.temp && isNum(sk.temp.bias)) return value - sk.temp.bias;
-  if ((varName === 'wind' || varName === 'gust') && sk.wind && isNum(sk.wind.ratio)) return value * sk.wind.ratio;
+  const sec = sk.sectors?.[sectorOf(dir)];
+  if (varName === 'temp' || varName === 'feels') {
+    const bias = isNum(sec?.bias) ? sec.bias : sk.temp?.bias;
+    return isNum(bias) ? value - bias : value;
+  }
+  if (varName === 'wind' || varName === 'gust') {
+    let ratio = isNum(sec?.ratio) ? sec.ratio : sk.wind?.ratio;
+    if (varName === 'gust' && isNum(sk.wind?.gustRatio)) ratio = sk.wind.gustRatio;
+    return isNum(ratio) ? value * ratio : value;
+  }
   return value;
 }
 
@@ -145,7 +157,7 @@ export function combine(sources, { now, skill = {}, ensemblePop = {} } = {}) {
         if (!isNum(raw)) continue;
         const w = sourceWeight(s, v, lead, skill);
         if (w <= 0) continue;
-        vals[v].push([corrected(raw, v, sk), w, s.id]);
+        vals[v].push([corrected(raw, v, sk, s.data.dir?.[i]), w, s.id]);
       }
     });
 

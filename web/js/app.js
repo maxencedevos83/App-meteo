@@ -80,6 +80,7 @@ function render(fc) {
   renderWind(fc.hours.slice(0, 30));
   renderDays(fc.days);
   renderSea(fc.marine);
+  renderHistory(fc);
   renderSources(fc);
   radar.center(fc.latitude, fc.longitude);
 }
@@ -208,21 +209,75 @@ function renderSea(marine) {
     <div class="stat"><small>Max 24 h</small><b>${maxWave.toFixed(1)} m</b></div>`;
 }
 
+// Deux courbes (prévu / mesuré) pour une grandeur sur les dernières heures.
+function lineChart(points, key, unit) {
+  const pts = points.filter((p) => p.obs[key] != null || p.fc?.[key] != null);
+  if (pts.length < 2) return '';
+  const W = Math.max(280, $('#history').clientWidth || 600), H = 110, padL = 30, padR = 8, padT = 14, padB = 18;
+  const vals = pts.flatMap((p) => [p.obs[key], p.fc?.[key]]).filter((v) => v != null);
+  const lo = Math.floor(Math.min(...vals) - 1), hi = Math.ceil(Math.max(...vals) + 1);
+  const t0 = Date.parse(pts[0].time + ':00Z'), t1 = Date.parse(pts.at(-1).time + ':00Z');
+  const x = (p) => padL + ((Date.parse(p.time + ':00Z') - t0) / (t1 - t0 || 1)) * (W - padL - padR);
+  const y = (v) => padT + (1 - (v - lo) / (hi - lo || 1)) * (H - padT - padB);
+  const path = (get) => {
+    let d = '', pen = false;
+    for (const p of pts) {
+      const v = get(p);
+      if (v == null) { pen = false; continue; }
+      d += `${pen ? 'L' : 'M'}${x(p).toFixed(1)},${y(v).toFixed(1)}`; pen = true;
+    }
+    return d;
+  };
+  const ticks = pts.filter((p) => +p.time.slice(11, 13) % 12 === 0).map((p) => `<text x="${x(p)}" y="${H - 4}" text-anchor="middle">${+p.time.slice(11, 13)}h</text>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${unit} prévu et mesuré">
+    <text x="2" y="10">${unit}</text>
+    <line x1="${padL}" x2="${W - padR}" y1="${y(lo + 1)}" y2="${y(lo + 1)}" stroke="var(--line)"/><text x="${padL - 4}" y="${y(lo + 1) + 3}" text-anchor="end">${lo + 1}</text>
+    <line x1="${padL}" x2="${W - padR}" y1="${y(hi - 1)}" y2="${y(hi - 1)}" stroke="var(--line)"/><text x="${padL - 4}" y="${y(hi - 1) + 3}" text-anchor="end">${hi - 1}</text>
+    <path d="${path((p) => p.fc?.[key])}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 4"/>
+    <path d="${path((p) => p.obs[key])}" fill="none" stroke="var(--warm)" stroke-width="2.2"/>
+    ${ticks}
+  </svg>`;
+}
+
+function renderHistory(fc) {
+  const hist = fc.history || [];
+  const hasPairs = hist.some((p) => p.fc);
+  $('#history-card').hidden = fc.local || !hist.length;
+  if (fc.local || !hist.length) return;
+  const b = fc.scores?.blend;
+  const models = (fc.scores?.models || []).filter((m) => m.temp?.n >= 10);
+  const best = (k) => models.reduce((m, x) => (x[k] && (!m || x[k].mae < m[k].mae) ? x : m), null);
+  const bt = best('temp'), bw = best('wind');
+  const stat = (label, val, sub) => `<div class="stat"><small>${label}</small><b>${val}</b><small>${sub}</small></div>`;
+  $('#history-stats').innerHTML = [
+    stat('Erreur temp.', b?.temp ? `±${b.temp.mae.toFixed(1)}°` : '…', bt ? `meilleur : ${esc(bt.label)} ±${bt.temp.mae.toFixed(1)}°` : 'en cours de mesure'),
+    stat('Erreur vent', b?.wind ? `±${b.wind.mae.toFixed(1)} kn` : '…', bw ? `meilleur : ${esc(bw.label)} ±${bw.wind.mae.toFixed(1)}` : 'en cours de mesure'),
+    stat('Pluie', b?.precip ? `${Math.round(b.precip.accuracy * 100)} %` : '…', b?.precip ? 'heures bien prévues' : 'en cours de mesure'),
+  ].join('');
+  $('#history').innerHTML = (hasPairs ? '' : '<p class="explain">Les premières comparaisons apparaîtront quelques heures après la mise en route.</p>')
+    + lineChart(hist, 't', '°C') + lineChart(hist, 'w', 'Vent kn');
+  const st = fc.scores?.stations || [];
+  $('#history-src').textContent = st.length
+    ? `Mesures : stations Météo-France ${st.map((s) => `${s.name.toLowerCase().replace(/(^|[\s-])\S/g, (c) => c.toUpperCase())} (${s.km} km)`).join(', ')}, complétées par l'aéroport ${fc.scores.station}.`
+    : `Mesures : aéroport ${fc.scores?.station ?? ''}.`;
+}
+
 function renderSources(fc) {
   const scores = Object.fromEntries((fc.scores?.models || []).map((m) => [m.id, m]));
   const maxW = Math.max(...fc.models.map((m) => m.weight || 0), 1);
   const verif = fc.scores
-    ? ` Les modèles sont comparés en continu aux observations de la station ${esc(fc.scores.station)} (${fc.scores.observations} relevés) : ceux qui se trompent le moins chez toi gagnent du poids, et leurs biais sont corrigés.`
+    ? ` Les modèles sont comparés en continu aux mesures des stations proches (${fc.scores.observations} relevés) : ceux qui se trompent le moins chez toi gagnent du poids, et leurs biais sont corrigés, y compris selon le régime de vent (mistral, vent d'est…). Colonnes : erreur moyenne mesurée, et part des heures où la pluie était bien prévue.`
     : '';
   $('#explain').innerHTML = `Chaque valeur est une moyenne pondérée de ${fc.models.length} modèles. Les modèles fins de Météo-France (AROME) pèsent le plus à courte échéance, ECMWF à plus long terme, et les modèles Windguru pèsent environ 40 % du vent.${verif}`;
   const fmt = (s, k, unit) => (s?.[k] ? `${s[k].mae.toFixed(1)} ${unit}<small>${s[k].n} comp.</small>` : '<small>en cours</small>');
   $('#sources').innerHTML = `<table>
-    <tr><th>Modèle</th><th>Poids</th><th class="num">Erreur temp.</th><th class="num">Erreur vent</th></tr>
+    <tr><th>Modèle</th><th>Poids</th><th class="num">Temp.</th><th class="num">Vent</th><th class="num">Pluie</th></tr>
     ${fc.models.map((m) => `<tr>
       <td>${esc(m.label)}<small>${esc(m.provider || '')}</small></td>
       <td style="width:22%"><div class="wbar" style="width:${(m.weight / maxW) * 100}%"></div><small>${m.weight} %</small></td>
       <td class="num">${fc.local ? '–' : fmt(scores[m.id], 'temp', '°')}</td>
       <td class="num">${fc.local ? '–' : fmt(scores[m.id], 'wind', 'kn')}</td>
+      <td class="num">${fc.local || !scores[m.id]?.precip ? '–' : `${Math.round(scores[m.id].precip.accuracy * 100)} %`}</td>
     </tr>`).join('')}
   </table>`;
   const errs = fc.errors || [];

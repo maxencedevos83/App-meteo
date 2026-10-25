@@ -31,7 +31,14 @@ const minutely = Array.from({ length: 12 }, (_, i) => ({ time: new Date(Date.par
 const sun = Array.from({ length: 10 }, (_, d) => { const date = times[d * 24].slice(0, 10); return { date, sunrise: `${date}T07:40`, sunset: `${date}T17:25`, uv: 3 }; });
 const marine = times.slice(0, 72).map((t) => ({ time: t, wave: 0.6, waveDir: 120, period: 5, sst: 19.4 }));
 const scores = { station: config.metar, observations: 210, runs: 40, models: models.map((m, k) => ({ id: m.id, label: m.label, temp: { n: 180, mae: 0.8 + k * 0.12, bias: 0.3 }, wind: { n: 180, mae: 2 + k * 0.2, ratio: 1 } })) };
+scores.blend = { id: '_blend', label: 'Prévision combinée', temp: { n: 180, mae: 0.7, bias: 0.1 }, wind: { n: 180, mae: 1.8, ratio: 1 }, precip: { n: 180, accuracy: 0.94, wetObs: 12 } };
+scores.stations = [{ name: 'LE LAVANDOU', km: 0.4, alt: 10 }, { name: 'BORMES-LES-MIMOSAS', km: 3.2, alt: 60 }, { name: 'HYERES', km: 18.3, alt: 3 }];
 const fc = buildForecast({ config, sources, nowcast: { minutely, sun, isDay: true }, marine, scores, now });
+fc.history = Array.from({ length: 48 }, (_, i) => {
+  const time = new Date(Date.parse(start + ':00Z') - (48 - i) * 3600000).toISOString().slice(0, 16);
+  const t = 15 + 5 * Math.sin(((+time.slice(11, 13) - 9) / 24) * 2 * Math.PI);
+  return { time, obs: { t: t + Math.sin(i) * 0.6, w: 10 + 6 * Math.sin(i / 8), g: null, p: 0 }, fc: i > 3 ? { t: t + 0.4, w: 11 + 5 * Math.sin(i / 8 + 0.3), g: null, p: 0 } : null, src: 'mf' };
+});
 await mkdir(join(root, 'out', 'data'), { recursive: true });
 await writeFile(join(root, 'out', 'data', 'forecast.json'), JSON.stringify(fc));
 await writeFile(join(root, 'out', 'data', 'widget.json'), JSON.stringify(buildWidget(fc), null, 1));
