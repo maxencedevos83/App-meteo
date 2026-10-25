@@ -77,3 +77,14 @@ test('CSV horaire Météo-France : stations proches, unités et heure locale', a
   assert.equal(o.d, 300);
   assert.ok(o.w > 11 && o.w < 12);
 });
+
+test('CSV horaire Météo-France : liste de stations imposée', async () => {
+  const lines = [
+    'NUM_POSTE;NOM_USUEL;LAT;LON;ALTI;AAAAMMJJHH;FF;T',
+    '83031001;COLLOBRIERES_SAPC;43.2400;6.3100;150;2026102509;1;9.0',
+    '83019001;BORMES LES MIMOSAS;43.1500;6.3400;60;2026102509;5;16.0',
+  ];
+  async function* gen() { yield* lines; }
+  const { stations } = await parseStationsCsv(gen(), { lat: 43.1375, lon: 6.3683, radiusKm: 20, maxStations: 4, since: '2026102000', timeZone: 'Europe/Paris', only: ['Bormes les Mimosas'] });
+  assert.deepEqual(stations.map((s) => s.name), ['BORMES LES MIMOSAS']);
+});

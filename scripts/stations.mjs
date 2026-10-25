@@ -34,7 +34,7 @@ const num = (v) => {
 };
 
 // Lit le CSV (séparateur ;) en flux et ne garde que les stations proches et les jours récents.
-export async function parseStationsCsv(lines, { lat, lon, radiusKm, maxStations, since, timeZone }) {
+export async function parseStationsCsv(lines, { lat, lon, radiusKm, maxStations, since, timeZone, only = null }) {
   let header = null;
   const stations = new Map();
   const rows = [];
@@ -54,7 +54,11 @@ export async function parseStationsCsv(lines, { lat, lon, radiusKm, maxStations,
     if (stations.get(id).km > radiusKm) continue;
     rows.push({ id, stamp, t: num(get('T')), ff: num(get('FF')), fxi: num(get('FXI')), dd: num(get('DD')), rr: num(get('RR1')) });
   }
-  const near = [...stations.values()].filter((s) => s.km <= radiusKm).sort((a, b) => a.km - b.km).slice(0, maxStations);
+  // `only` : liste de noms de stations retenues (par exemple les stations côtières, plus représentatives).
+  const wanted = only?.length ? new Set(only.map((n) => n.toUpperCase())) : null;
+  const near = [...stations.values()]
+    .filter((s) => s.km <= radiusKm && (!wanted || wanted.has(s.name.toUpperCase())))
+    .sort((a, b) => a.km - b.km).slice(0, maxStations);
   const keep = new Set(near.map((s) => s.id));
   const byHour = {};
   for (const r of rows) {
@@ -95,7 +99,7 @@ export async function fetchStationObs(config, state, now = new Date()) {
   if (/\.gz($|\?)/.test(url)) stream = stream.pipe(createGunzip());
   const since = new Date(now - KEEP_DAYS * 86400000).toISOString().replace(/\D/g, '').slice(0, 10);
   const { stations, byHour } = await parseStationsCsv(createInterface({ input: stream, crlfDelay: Infinity }), {
-    lat: config.latitude, lon: config.longitude, radiusKm: st.radiusKm ?? 20, maxStations: st.max ?? 4, since, timeZone: config.timezone,
+    lat: config.latitude, lon: config.longitude, radiusKm: st.radiusKm ?? 20, maxStations: st.max ?? 4, since, timeZone: config.timezone, only: st.only,
   });
   const obs = {};
   for (const [key, records] of Object.entries(byHour)) {
