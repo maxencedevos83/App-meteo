@@ -59,7 +59,22 @@ main { max-width: 760px; margin: 0 auto; padding: 0 16px; display: grid; gap: 14
 .hint { color: var(--muted); font-size: 12px; }
 
 /* Bandeau principal */
-.hero { background: linear-gradient(160deg, var(--hero-a), var(--hero-b)); color: var(--hero-ink); }
+.hero { background: linear-gradient(160deg, var(--hero-a), var(--hero-b)); color: var(--hero-ink); position: relative; overflow: hidden; transition: background .6s; }
+.hero > :not(.hero-scene) { position: relative; z-index: 1; }
+.hero-main, .hero-rain, .hero-stats { text-shadow: 0 1px 3px rgb(0 0 0 / 30%); }
+.hero-scene { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+.hero-icon { min-width: 64px; min-height: 64px; display: grid; place-items: center; }
+.hero .stat, .hero .hero-rain { backdrop-filter: blur(3px); }
+/* Ciel selon le temps (posé par scene.js) */
+.hero[data-sky="clear-day"] { background: linear-gradient(160deg, #2478dc, #5abef5); }
+.hero[data-sky="clear-night"] { background: linear-gradient(160deg, #0a1028, #283868); }
+.hero[data-sky="partly-day"] { background: linear-gradient(160deg, #3470c4, #78b0e2); }
+.hero[data-sky="partly-night"] { background: linear-gradient(160deg, #141e30, #2c405c); }
+.hero[data-sky^="cloudy"], .hero[data-sky^="fog"] { background: linear-gradient(160deg, #54667a, #8a9aac); }
+.hero[data-sky$="night"][data-sky^="cloudy"], .hero[data-sky$="night"][data-sky^="fog"] { background: linear-gradient(160deg, #242e3c, #424e5e); }
+.hero[data-sky^="rain"], .hero[data-sky^="drizzle"] { background: linear-gradient(160deg, #304254, #587082); }
+.hero[data-sky^="snow"] { background: linear-gradient(160deg, #627caa, #b0c2de); }
+.hero[data-sky^="storm"] { background: linear-gradient(160deg, #221636, #4a3a68); }
 .hero .skeleton { padding: 40px 0; text-align: center; opacity: .8; }
 .hero-main { display: flex; align-items: center; gap: 14px; }
 .hero-icon { font-size: 64px; line-height: 1; }

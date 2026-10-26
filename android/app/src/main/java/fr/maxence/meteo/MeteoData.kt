@@ -61,6 +61,9 @@ object MeteoData {
         null
     }
 
+    /** Le vent est publié en nœuds (unité des modèles) et affiché en km/h. */
+    fun kmh(kn: Double?): String = kn?.let { Math.round(it * 1.852).toString() } ?: "–"
+
     // Échelle de couleurs du vent (nœuds), proche de Windguru.
     private val STOPS = listOf(
         0 to intArrayOf(255, 255, 255), 5 to intArrayOf(200, 245, 255), 9 to intArrayOf(120, 230, 160),

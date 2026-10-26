@@ -47,6 +47,9 @@ class MeteoWidget : AppWidgetProvider() {
 
     companion object {
         const val ACTION_REFRESH = "fr.maxence.meteo.REFRESH"
+        private val ICON_FRAMES = listOf(
+            R.id.icon_f0, R.id.icon_f1, R.id.icon_f2, R.id.icon_f3, R.id.icon_f4, R.id.icon_f5, R.id.icon_f6, R.id.icon_f7,
+        )
 
         fun render(context: Context, data: JSONObject?) {
             val manager = AppWidgetManager.getInstance(context)
@@ -110,9 +113,20 @@ class MeteoWidget : AppWidgetProvider() {
             fun num(o: JSONObject, k: String): Double? = if (o.isNull(k)) null else o.optDouble(k).takeIf { !it.isNaN() }
             fun int(o: JSONObject, k: String) = num(o, k)?.let { Math.round(it).toString() } ?: "–"
 
-            v.setTextViewText(R.id.icon, d.optString("icon"))
+            val density = context.resources.displayMetrics.density
+            val code = d.optInt("code", 3)
+            val isDay = d.optBoolean("isDay", true)
+            // Icône animée : une image par étape de la boucle (la même partout si les animations sont coupées).
+            val windy = (num(d, "gust") ?: 0.0) >= 30 || (num(d, "wind") ?: 0.0) >= 18
+            val iconPx = ((if (size == Size.SMALL) 46 else 60) * density).toInt()
+            val still = if (style.animated) null else WeatherArt.icon(code, isDay, windy, iconPx, 0)
+            ICON_FRAMES.forEachIndexed { i, id -> v.setImageViewBitmap(id, still ?: WeatherArt.icon(code, isDay, windy, iconPx, i)) }
+            // Fond aux couleurs du ciel.
+            if (style.bgColor == WidgetStyle.WEATHER) {
+                v.setImageViewBitmap(R.id.bg, WeatherArt.background(code, isDay, (widthDp * density).toInt(), (heightDp * density).toInt(), 22 * density))
+            }
             v.setTextViewText(R.id.temp, "${int(d, "temp")}°")
-            v.setTextViewText(R.id.wind, "${MeteoData.arrow(num(d, "dirDeg"))} ${int(d, "wind")} kn · raf. ${int(d, "gust")} ${d.optString("dir")}")
+            v.setTextViewText(R.id.wind, "${MeteoData.arrow(num(d, "dirDeg"))} ${MeteoData.kmh(num(d, "wind"))} km/h · raf. ${MeteoData.kmh(num(d, "gust"))} ${d.optString("dir")}")
             val rain = d.optString("rain")
             val sea = num(d, "sea")?.let { " · mer ${Math.round(it)}°" } ?: ""
             v.setTextViewText(R.id.rain, "💧 ${if (rain.isNotEmpty()) rain else "${int(d, "pop")} % de pluie"}$sea")
@@ -147,14 +161,15 @@ class MeteoWidget : AppWidgetProvider() {
                 arrayOf(R.id.h5_t, R.id.h5_icon, R.id.h5_temp, R.id.h5_wind),
             )
             val days = d.optJSONArray("d")
+            val smallIconPx = (26 * density).toInt()
             // Colonne d'un jour : nom (et risque de pluie), icône, min/max, vent moyen·rafales.
             fun fillDay(ids: Array<Int>, day: JSONObject) {
                 val pop = num(day, "pop") ?: 0.0
                 v.setTextViewText(ids[0], if (pop >= 40) "${day.optString("day")} ${Math.round(pop)}%" else day.optString("day"))
-                v.setTextViewText(ids[1], day.optString("icon"))
+                v.setImageViewBitmap(ids[1], WeatherArt.icon(day.optInt("code", 3), true, false, smallIconPx, 0))
                 v.setTextViewText(ids[2], "${int(day, "min")}/${int(day, "max")}°")
                 val wind = num(day, "wind") ?: 0.0
-                v.setTextViewText(ids[3], "${Math.round(wind)}·${int(day, "gust")}")
+                v.setTextViewText(ids[3], "${MeteoData.kmh(wind)}·${MeteoData.kmh(num(day, "gust"))}")
                 v.setInt(ids[3], "setBackgroundColor", MeteoData.windColor(wind))
             }
 
@@ -177,15 +192,14 @@ class MeteoWidget : AppWidgetProvider() {
                 val h = hours?.optJSONObject(i) ?: return@forEachIndexed
                 val pop = num(h, "pop") ?: 0.0
                 v.setTextViewText(ids[0], if (pop >= 30) "${h.optString("t")} ${Math.round(pop)}%" else h.optString("t"))
-                v.setTextViewText(ids[1], h.optString("icon"))
+                v.setImageViewBitmap(ids[1], WeatherArt.icon(h.optInt("code", 3), h.optBoolean("isDay", true), false, smallIconPx, 0))
                 v.setTextViewText(ids[2], "${int(h, "temp")}°")
                 val wind = num(h, "wind") ?: 0.0
-                v.setTextViewText(ids[3], "${MeteoData.arrow(num(h, "dirDeg"))}${Math.round(wind)}")
+                v.setTextViewText(ids[3], "${MeteoData.arrow(num(h, "dirDeg"))}${MeteoData.kmh(wind)}")
                 v.setInt(ids[3], "setBackgroundColor", MeteoData.windColor(wind))
             }
 
             if (size == Size.LARGE) {
-                val density = context.resources.displayMetrics.density
                 // Hauteur du graphe : ce qui reste une fois les autres lignes placées (≈ 250 dp, plus l'horloge).
                 val chartHeightDp = (heightDp - 250 - clockDp + if (style.daily) 60 else 0).coerceIn(50, 180)
                 val bmp = ChartRenderer.render(d.optJSONArray("chart"), ((widthDp - 24) * density).toInt(), (chartHeightDp * density).toInt(), density, style.textColor)

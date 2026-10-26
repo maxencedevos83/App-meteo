@@ -97,6 +97,12 @@ class MainActivity : Activity() {
         label("Prévision dans le widget")
         add(radios(listOf("Par jour" to 1, "Par heure" to 0), { if (style.daily) 1 else 0 }) { update(style.copy(daily = it == 1)) })
 
+        add(CheckBox(this).apply {
+            text = "Icône animée (soleil, pluie, éclairs, vent…)"
+            isChecked = style.animated
+            setOnCheckedChangeListener { _, on -> update(style.copy(animated = on)) }
+        })
+
         label("Heure")
         val clockChoices = listOf("Grande horloge" to WidgetStyle.CLOCK_BIG, "Petite" to WidgetStyle.CLOCK_SMALL, "Masquée" to WidgetStyle.CLOCK_HIDDEN)
         add(radios(clockChoices, { style.clock }) { update(style.copy(clock = it)) })
@@ -121,8 +127,8 @@ class MainActivity : Activity() {
                 setOnCheckedChangeListener { _, on -> Notifier.setEnabled(this@MainActivity, key, on) }
             })
         }
-        slider("Vent violent à partir de rafales de", 15, 50, { Notifier.gustThreshold(this) }, { "$it kn (${Math.round(it * 1.852)} km/h)" }) {
-            Notifier.setGustThreshold(this, it)
+        slider("Vent violent à partir de rafales de", 30, 100, { Notifier.gustThresholdKmh(this) }, { "$it km/h" }) {
+            Notifier.setGustThresholdKmh(this, it)
         }
         label("Vigilance Météo-France à partir de")
         add(radios(listOf("Jaune" to 2, "Orange" to 3), { Notifier.vigilanceMin(this) }) { Notifier.setVigilanceMin(this, it) })
@@ -228,7 +234,7 @@ class MainActivity : Activity() {
                     data == null -> "Impossible de récupérer la prévision : $error"
                     error != null -> "Hors ligne ($error). Dernière prévision : ${data.optString("updated")}"
                     else -> "${data.optString("place")} : ${data.optString("temp")}° ${data.optString("cond")}, " +
-                        "vent ${data.optString("wind")} kn (raf. ${data.optString("gust")}). Mise à jour ${data.optString("updated")}."
+                        "vent ${MeteoData.kmh(data.optDouble("wind"))} km/h (raf. ${MeteoData.kmh(data.optDouble("gust"))}). Mise à jour ${data.optString("updated")}."
                 }
             }
         }
@@ -306,7 +312,9 @@ class MainActivity : Activity() {
         }
         val sync = {
             for ((v, color) in views) {
-                v.background = (if (color == 0) {
+                v.background = (if (color == WidgetStyle.WEATHER) {
+                    GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(255, 200, 60), Color.rgb(36, 120, 220), Color.rgb(74, 58, 104)))
+                } else if (color == 0) {
                     GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(29, 95, 168), Color.rgb(61, 139, 216)))
                 } else {
                     GradientDrawable().apply { setColor(color) }
