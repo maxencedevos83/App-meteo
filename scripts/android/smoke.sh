@@ -19,5 +19,8 @@ echo "===== Journal de l'appli ====="
 adb logcat -d | grep -E "AndroidRuntime|$PKG|MeteoWidget|AlertJob" | tail -150
 adb shell dumpsys activity processes | grep -c "$PKG" || true
 adb exec-out screencap -p > screen.png || true
+echo "===== Erreurs de l'appli ====="
+adb logcat -d -s Meteo:E | tee errors.txt
 if [ -s crash.txt ]; then echo "PLANTAGE DÉTECTÉ"; exit 1; fi
+if grep -q " E Meteo" errors.txt; then echo "ERREUR DANS L'APPLI"; exit 1; fi
 echo "Aucun plantage."

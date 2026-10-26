@@ -76,6 +76,7 @@ jobs:
           path: |
             screen.png
             crash.txt
+            errors.txt
           if-no-files-found: ignore
 
       - name: Publier la version
