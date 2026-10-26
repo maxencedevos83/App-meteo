@@ -3,9 +3,9 @@ name: Widget Android
 on:
   push:
     branches: [main]
-    paths: ['android/**', '.github/workflows/android.yml']
+    paths: ['android/**', '.github/workflows/android.yml', 'scripts/android/**']
   pull_request:
-    paths: ['android/**', '.github/workflows/android.yml']
+    paths: ['android/**', '.github/workflows/android.yml', 'scripts/android/**']
   workflow_dispatch:
 
 permissions:
@@ -52,8 +52,35 @@ jobs:
           name: meteo-widget
           path: meteo-widget.apk
 
+      # Essai réel sur un émulateur Android : l'appli s'ouvre, les alertes tournent, aucun plantage.
+      - name: Activer KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Essai sur émulateur
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: bash scripts/android/smoke.sh meteo-widget.apk
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emulateur
+          path: |
+            screen.png
+            crash.txt
+            errors.txt
+          if-no-files-found: ignore
+
       - name: Publier la version
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

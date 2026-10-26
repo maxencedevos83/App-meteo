@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import android.text.InputType
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -200,7 +201,7 @@ class MainActivity : Activity() {
         WidgetStyle.save(this, next)
         refreshers.forEach { it() }
         updatePreview()
-        MeteoWidget.render(this, MeteoData.cached(this))
+        runCatching { MeteoWidget.render(this, MeteoData.cached(this)) }
     }
 
     private fun updatePreview() {
@@ -208,16 +209,16 @@ class MainActivity : Activity() {
             val views = MeteoWidget.build(this, MeteoData.cached(this), MeteoWidget.Size.MEDIUM, 320, 210)
             preview.removeAllViews()
             preview.addView(views.apply(this, preview))
-        }
+        }.onFailure { Log.e("Meteo", "Aperçu du widget impossible", it) }
     }
 
     private fun refresh() {
         status.text = "Actualisation…"
         thread {
             val data = MeteoData.refresh(this)
-            MeteoWidget.render(this, data)
+            runCatching { MeteoWidget.render(this, data) }.onFailure { Log.e("Meteo", "Widget", it) }
             val error = MeteoData.lastError(this)
-            if (error == null) Notifier.notifyNew(this, data)
+            if (error == null) runCatching { Notifier.notifyNew(this, data) }.onFailure { Log.e("Meteo", "Alertes", it) }
             runOnUiThread {
                 updatePreview()
                 status.text = when {
