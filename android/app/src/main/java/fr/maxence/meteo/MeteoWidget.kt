@@ -35,8 +35,8 @@ class MeteoWidget : AppWidgetProvider() {
         thread {
             try {
                 val data = MeteoData.refresh(context)
-                render(context, data)
-                if (MeteoData.lastError(context) == null) Notifier.notifyNew(context, data)
+                runCatching { render(context, data) }
+                if (MeteoData.lastError(context) == null) runCatching { Notifier.notifyNew(context, data) }
             } finally {
                 pending.finish()
             }

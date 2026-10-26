@@ -200,7 +200,7 @@ class MainActivity : Activity() {
         WidgetStyle.save(this, next)
         refreshers.forEach { it() }
         updatePreview()
-        MeteoWidget.render(this, MeteoData.cached(this))
+        runCatching { MeteoWidget.render(this, MeteoData.cached(this)) }
     }
 
     private fun updatePreview() {
@@ -215,9 +215,9 @@ class MainActivity : Activity() {
         status.text = "Actualisation…"
         thread {
             val data = MeteoData.refresh(this)
-            MeteoWidget.render(this, data)
+            runCatching { MeteoWidget.render(this, data) }
             val error = MeteoData.lastError(this)
-            if (error == null) Notifier.notifyNew(this, data)
+            if (error == null) runCatching { Notifier.notifyNew(this, data) }
             runOnUiThread {
                 updatePreview()
                 status.text = when {

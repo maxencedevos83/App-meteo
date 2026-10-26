@@ -18,8 +18,8 @@ class AlertJob : JobService() {
         thread {
             try {
                 val data = MeteoData.refresh(this)
-                MeteoWidget.render(this, data)
-                if (MeteoData.lastError(this) == null) Notifier.notifyNew(this, data)
+                runCatching { MeteoWidget.render(this, data) }
+                if (MeteoData.lastError(this) == null) runCatching { Notifier.notifyNew(this, data) }
             } finally {
                 jobFinished(params, false)
             }
@@ -33,6 +33,11 @@ class AlertJob : JobService() {
         private const val ID = 4242
 
         fun schedule(context: Context) {
+            // Une alerte non programmée ne doit jamais empêcher l'appli ou le widget de s'ouvrir.
+            runCatching { doSchedule(context) }
+        }
+
+        private fun doSchedule(context: Context) {
             val scheduler = context.getSystemService(JobScheduler::class.java)
             if (scheduler.getPendingJob(ID) != null) return
             scheduler.schedule(
