@@ -13,6 +13,7 @@ import java.net.URL
 import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Position approximative du téléphone (précision de la ville, sans GPS fin) et nom de la ville.
@@ -65,19 +66,23 @@ object Position {
         // Dernière position connue la plus récente, tous fournisseurs confondus.
         val last = providers.mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }.maxByOrNull { it.time }
         if (last != null && System.currentTimeMillis() - last.time < 30 * 60_000) return last
-        // Sinon une position neuve, par le réseau (rapide et économe), 10 s au plus.
+        // Sinon une position neuve : on interroge en même temps tous les fournisseurs (réseau, fusionné, GPS)
+        // et on garde la première réponse, 10 s au plus. Certains téléphones n'ont pas de position « réseau ».
         if (Build.VERSION.SDK_INT >= 30) {
-            val provider = when {
-                LocationManager.NETWORK_PROVIDER in providers -> LocationManager.NETWORK_PROVIDER
-                LocationManager.FUSED_PROVIDER in providers -> LocationManager.FUSED_PROVIDER
-                providers.isNotEmpty() -> providers.first()
-                else -> return last
-            }
+            val wanted = listOf(LocationManager.FUSED_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
+                .filter { it in providers }
+            if (wanted.isEmpty()) return last
             val latch = CountDownLatch(1)
-            var got: Location? = null
-            lm.getCurrentLocation(provider, null, context.mainExecutor) { got = it; latch.countDown() }
+            val got = AtomicReference<Location?>()
+            for (provider in wanted) {
+                runCatching {
+                    lm.getCurrentLocation(provider, null, context.mainExecutor) { loc ->
+                        if (loc != null && got.compareAndSet(null, loc)) latch.countDown()
+                    }
+                }
+            }
             latch.await(10, TimeUnit.SECONDS)
-            return got ?: last
+            return got.get() ?: last
         }
         return last
     }

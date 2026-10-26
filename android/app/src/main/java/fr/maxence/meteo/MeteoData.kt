@@ -37,6 +37,7 @@ object MeteoData {
         val home = cached(context)?.takeIf { !it.optBoolean("local") } ?: prefs(context).getString("home", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
         val homeLat = home?.optDouble("lat", 43.1375) ?: 43.1375
         val homeLon = home?.optDouble("lon", 6.3683) ?: 6.3683
+        if (Position.follow(context)) Log.i("Meteo", if (here == null) "Position inconnue : lieu principal" else "Position : ${here.name}")
         if (here != null && LocalForecast.distanceKm(here.lat, here.lon, homeLat, homeLon) > HOME_RADIUS_KM) {
             return try {
                 val json = LocalForecast.build(here.lat, here.lon, here.name)
