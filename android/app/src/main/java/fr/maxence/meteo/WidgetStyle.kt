@@ -25,6 +25,8 @@ object WidgetStyle {
         val textScale: Int = 100,
         val clock: Int = CLOCK_BIG,
         val showDate: Boolean = true,
+        // Prévision du widget par jour (sinon par heure).
+        val daily: Boolean = true,
     )
 
     val BACKGROUNDS = listOf(
@@ -61,6 +63,7 @@ object WidgetStyle {
             textScale = p.getInt("style_scale", d.textScale),
             clock = p.getInt("style_clock", d.clock),
             showDate = p.getBoolean("style_date", d.showDate),
+            daily = p.getBoolean("style_daily", d.daily),
         )
     }
 
@@ -72,6 +75,7 @@ object WidgetStyle {
             .putInt("style_scale", s.textScale)
             .putInt("style_clock", s.clock)
             .putBoolean("style_date", s.showDate)
+            .putBoolean("style_daily", s.daily)
             .apply()
     }
 

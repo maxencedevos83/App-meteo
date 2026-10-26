@@ -123,7 +123,7 @@ export function buildWidget(fc) {
     wave: fc.marine?.[0]?.wave != null ? r1(fc.marine[0].wave) : null,
     sources: fc.models.filter((m) => m.weight > 0).length,
     h: nextHours,
-    d: fc.days.slice(0, 5).map((d, i) => ({ day: label(i), min: r0(d.min), max: r0(d.max), icon: codeEmoji(d.code, true), pop: d.pop, wind: d.wind, gust: d.gust })),
+    d: fc.days.slice(0, 7).map((d, i) => ({ day: label(i), min: r0(d.min), max: r0(d.max), icon: codeEmoji(d.code, true), pop: d.pop, wind: d.wind, gust: d.gust })),
     // 24 prochaines heures pour le graphe du grand widget.
     chart: fc.hours.slice(0, 24).map((h) => ({ t: h.time, h: +h.time.slice(11, 13), code: h.code, temp: r1(h.temp), wind: h.wind, gust: h.gust, dir: h.dir, pop: h.pop ?? 0, precip: h.precip ?? 0 })),
     alerts: fc.alerts || [],

@@ -94,6 +94,9 @@ class MainActivity : Activity() {
         }))
         slider("Taille du texte", 70, 150, { style.textScale }, { "$it %" }) { update(style.copy(textScale = it)) }
 
+        label("Prévision dans le widget")
+        add(radios(listOf("Par jour" to 1, "Par heure" to 0), { if (style.daily) 1 else 0 }) { update(style.copy(daily = it == 1)) })
+
         label("Heure")
         val clockChoices = listOf("Grande horloge" to WidgetStyle.CLOCK_BIG, "Petite" to WidgetStyle.CLOCK_SMALL, "Masquée" to WidgetStyle.CLOCK_HIDDEN)
         add(radios(clockChoices, { style.clock }) { update(style.copy(clock = it)) })
