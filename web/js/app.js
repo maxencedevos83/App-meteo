@@ -1,7 +1,8 @@
-import { codeEmoji, codeLabel, dirLabel } from './ensemble.js';
+import { codeEmoji, codeLabel, dirLabel, kmh, KMH } from './ensemble.js';
 import { fetchAllOpenMeteo, fetchEnsemblePop, fetchNowcast, fetchMarine, geocode } from './sources.js';
 import { buildForecast } from './forecast.js';
 import { buildAlerts, dayWord } from './alerts.js';
+import { startScene, skyKind } from './scene.js';
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -100,7 +101,7 @@ function renderHero(fc) {
   const banner = fc.local ? '<div class="banner" style="margin-bottom:12px;color:var(--ink)">Lieu secondaire : modèles Open-Meteo seulement (Windguru et vérification locale sont réservés au lieu principal).</div>' : '';
   $('#hero').innerHTML = `${banner}
     <div class="hero-main">
-      <div class="hero-icon">${codeEmoji(h.code, h.isDay)}</div>
+      <div class="hero-icon" aria-label="${codeLabel(h.code, h.isDay)}">${['clear', 'partly'].includes(skyKind(h.code)) ? '' : codeEmoji(h.code, h.isDay)}</div>
       <div>
         <div class="hero-temp">${r0(h.temp)}°</div>
       </div>
@@ -112,10 +113,12 @@ function renderHero(fc) {
     </div>
     ${fc.rain?.text ? `<div class="hero-rain">💧 ${esc(fc.rain.text)}<div class="rain-bars">${bars}</div></div>` : ''}
     <div class="hero-stats">
-      <div class="stat"><small>Vent</small><b>${arrow(h.dir)} ${r0(h.wind)} kn</b><small>${dirLabel(h.dir)} · raf. ${r0(h.gust)}</small></div>
+      <div class="stat"><small>Vent</small><b>${arrow(h.dir)} ${r0(kmh(h.wind))} km/h</b><small>${dirLabel(h.dir)} · raf. ${r0(kmh(h.gust))}</small></div>
       <div class="stat"><small>Pluie</small><b>${h.pop ?? 0} %</b><small>${h.precip ?? 0} mm/h</small></div>
       <div class="stat"><small>Fiabilité</small><b class="conf"><i style="background:${confColor(h.confidence)}"></i>${h.confidence} %</b><small>${h.n} modèles</small></div>
     </div>`;
+  // Ciel animé selon le temps qu'il fait : soleil, nuages, pluie, neige, éclairs, vent.
+  startScene($('#hero'), { code: h.code, isDay: h.isDay, wind: h.wind, gust: h.gust, anchor: $('#hero .hero-icon') });
 }
 
 function renderChart(hours) {
@@ -175,13 +178,13 @@ function windColor(kn) {
 }
 
 function renderWind(hours) {
-  const cell = (v) => `<td style="background:${windColor(v)};color:#111">${r0(v)}</td>`;
+  const cell = (v) => `<td style="background:${windColor(v)};color:#111">${r0(kmh(v))}</td>`;
   $('#wind').innerHTML = `<table>
     <tr><th>Heure</th>${hours.map((h) => `<td>${+h.time.slice(11, 13)}h</td>`).join('')}</tr>
     <tr><th>Vent</th>${hours.map((h) => cell(h.wind)).join('')}</tr>
     <tr><th>Rafales</th>${hours.map((h) => cell(h.gust)).join('')}</tr>
     <tr><th>Dir.</th>${hours.map((h) => `<td title="${dirLabel(h.dir)}">${arrow(h.dir)}</td>`).join('')}</tr>
-    <tr><th>Écart</th>${hours.map((h) => `<td style="color:var(--muted)">±${r0(h.windSpread)}</td>`).join('')}</tr>
+    <tr><th>Écart</th>${hours.map((h) => `<td style="color:var(--muted)">±${r0(kmh(h.windSpread))}</td>`).join('')}</tr>
   </table>`;
 }
 
@@ -199,7 +202,7 @@ function renderDays(days) {
       <div class="temps"><span class="lo">${r0(d.min)}°</span><span>${r0(d.max)}°</span></div>
       <div class="meta">
         <span class="${d.pop >= 30 ? 'wet' : ''}">💧 ${d.pop} %${d.precip >= 0.5 ? ` · ${d.precip} mm` : ''}</span>
-        <span>${arrow(d.dir)} ${d.wind} kn (${d.gust})</span>
+        <span>${arrow(d.dir)} ${r0(kmh(d.wind))} km/h (${r0(kmh(d.gust))})</span>
         <span class="conf"><i style="background:${confColor(d.confidence)}"></i>${d.confidence} %</span>
       </div>
     </div>`;
@@ -223,7 +226,7 @@ function renderSessions(fc) {
   $('#sessions-card').hidden = !acts.length;
   $('#sessions').innerHTML = acts.map((a) => {
     const wins = a.windows.map((w) => `<span class="win ${w.score < 75 ? 'mid' : ''}">${dayWord(w.start, fc.now)} ${+w.start.slice(11, 13)}h–${+w.end.slice(11, 13) + 1}h
-      <small>· ${a.id === 'baignade' || a.id === 'balade' ? `${w.score}/100` : `${w.wind} kn ${w.dir}`}${w.notes.length ? ` · ${esc(w.notes.join(', '))}` : ''}</small></span>`).join('');
+      <small>· ${a.id === 'baignade' || a.id === 'balade' ? `${w.score}/100` : `${r0(kmh(w.wind))} km/h ${w.dir}`}${w.notes.length ? ` · ${esc(w.notes.join(', '))}` : ''}</small></span>`).join('');
     // Bandeau 5 jours : une case par heure, couleur selon le score.
     const strip = a.scores.slice(0, 120).map((sc, i) => `<i style="background:${scoreColor(sc)}" title="${fc.hours[i]?.time.slice(5, 13).replace('T', ' ')}h : ${sc}"></i>`).join('');
     return `<div class="act"><div class="ico">${a.emoji}</div><div class="name">${a.label}</div>
@@ -243,7 +246,7 @@ function renderModels(fc) {
   }).join('');
   const row = (label, vals) => `<tr><th>${esc(label)}</th>${idx.map((i) => {
     const v = vals[i];
-    return `<td style="background:${windColor(v)};color:#111">${r0(v)}</td>`;
+    return `<td style="background:${windColor(v)};color:#111">${r0(kmh(v))}</td>`;
   }).join('')}</tr>`;
   $('#models-cmp').innerHTML = `<table><tr><th></th>${head}</tr>
     ${row('Combiné', fc.hours.map((h) => h.wind))}
@@ -321,11 +324,11 @@ function renderHistory(fc) {
   const stat = (label, val, sub) => `<div class="stat"><small>${label}</small><b>${val}</b><small>${sub}</small></div>`;
   $('#history-stats').innerHTML = [
     stat('Erreur temp.', b?.temp ? `±${b.temp.mae.toFixed(1)}°` : '…', bt ? `meilleur : ${esc(bt.label)} ±${bt.temp.mae.toFixed(1)}°` : 'en cours de mesure'),
-    stat('Erreur vent', b?.wind ? `±${b.wind.mae.toFixed(1)} kn` : '…', bw ? `meilleur : ${esc(bw.label)} ±${bw.wind.mae.toFixed(1)}` : 'en cours de mesure'),
+    stat('Erreur vent', b?.wind ? `±${(b.wind.mae * KMH).toFixed(1)} km/h` : '…', bw ? `meilleur : ${esc(bw.label)} ±${(bw.wind.mae * KMH).toFixed(1)}` : 'en cours de mesure'),
     stat('Pluie', b?.precip ? `${Math.round(b.precip.accuracy * 100)} %` : '…', b?.precip ? 'heures bien prévues' : 'en cours de mesure'),
   ].join('');
   $('#history').innerHTML = (hasPairs ? '' : '<p class="explain">Les premières comparaisons apparaîtront quelques heures après la mise en route.</p>')
-    + lineChart(hist, 't', '°C') + lineChart(hist, 'w', 'Vent kn');
+    + lineChart(hist, 't', '°C') + lineChart(hist.map((p) => ({ ...p, obs: { ...p.obs, w: kmh(p.obs.w) }, fc: p.fc && { ...p.fc, w: kmh(p.fc.w) } })), 'w', 'Vent km/h');
   const st = fc.scores?.stations || [];
   $('#history-src').textContent = st.length
     ? `Mesures : stations Météo-France ${st.map((s) => `${s.name.toLowerCase().replace(/(^|[\s-])\S/g, (c) => c.toUpperCase())} (${s.km} km)`).join(', ')}, complétées par l'aéroport ${fc.scores.station}.`
@@ -339,14 +342,14 @@ function renderSources(fc) {
     ? ` Les modèles sont comparés en continu aux mesures des stations proches (${fc.scores.observations} relevés) : ceux qui se trompent le moins chez toi gagnent du poids, et leurs biais sont corrigés, y compris selon le régime de vent (mistral, vent d'est…). Colonnes : erreur moyenne mesurée, et part des heures où la pluie était bien prévue.`
     : '';
   $('#explain').innerHTML = `Chaque valeur est une moyenne pondérée de ${fc.models.length} modèles. Les modèles fins de Météo-France (AROME) pèsent le plus à courte échéance, ECMWF à plus long terme, et les modèles Windguru pèsent environ 40 % du vent.${verif}`;
-  const fmt = (s, k, unit) => (s?.[k] ? `${s[k].mae.toFixed(1)} ${unit}<small>${s[k].n} comp.</small>` : '<small>en cours</small>');
+  const fmt = (s, k, unit, scale = 1) => (s?.[k] ? `${(s[k].mae * scale).toFixed(1)} ${unit}<small>${s[k].n} comp.</small>` : '<small>en cours</small>');
   $('#sources').innerHTML = `<table>
     <tr><th>Modèle</th><th>Poids</th><th class="num">Temp.</th><th class="num">Vent</th><th class="num">Pluie</th></tr>
     ${fc.models.map((m) => `<tr>
       <td>${esc(m.label)}<small>${esc(m.provider || '')}</small></td>
       <td style="width:22%"><div class="wbar" style="width:${(m.weight / maxW) * 100}%"></div><small>${m.weight} %</small></td>
       <td class="num">${fc.local ? '–' : fmt(scores[m.id], 'temp', '°')}</td>
-      <td class="num">${fc.local ? '–' : fmt(scores[m.id], 'wind', 'kn')}</td>
+      <td class="num">${fc.local ? '–' : fmt(scores[m.id], 'wind', 'km/h', KMH)}</td>
       <td class="num">${fc.local || !scores[m.id]?.precip ? '–' : `${Math.round(scores[m.id].precip.accuracy * 100)} %`}</td>
     </tr>`).join('')}
   </table>`;

@@ -280,6 +280,10 @@ export function codeEmoji(code, isDay = true) {
 }
 
 const DIRS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'];
+// Le vent est calculé en nœuds (unité des modèles et de Windguru) et affiché en km/h.
+export const KMH = 1.852;
+export const kmh = (kn) => (kn == null ? kn : kn * KMH);
+
 export function dirLabel(deg) {
   if (!isNum(deg)) return '';
   return DIRS[Math.round(deg / 22.5) % 16];

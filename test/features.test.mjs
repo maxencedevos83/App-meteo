@@ -49,7 +49,7 @@ test('alertes : pluie dans l\'heure, coup de vent, vigilance, créneau', () => {
   assert.deepEqual(types.slice(0, 3), ['vigilance', 'pluie', 'vent']);
   assert.ok(types.includes('session'));
   assert.equal(alerts.find((a) => a.type === 'pluie').title, 'Pluie vers 10h30');
-  assert.ok(alerts.find((a) => a.type === 'vent').title.includes('38'));
+  assert.ok(alerts.find((a) => a.type === 'vent').title.includes('70 km/h'));
   assert.equal(dayWord('2026-10-27T09:00', '2026-10-26T10:05'), 'demain');
 });
 

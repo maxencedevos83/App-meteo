@@ -1,5 +1,5 @@
 // Assemble la prévision finale (appli) et le résumé compact (widgets).
-import { combine, daily, codeLabel, codeEmoji, dirLabel, localKey } from './ensemble.js';
+import { combine, daily, codeLabel, codeEmoji, dirLabel, localKey, kmh } from './ensemble.js';
 import { buildActivities } from './activities.js';
 
 const r1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
@@ -88,7 +88,7 @@ export function buildWidget(fc) {
   const nextHours = [];
   for (let i = 1; i < fc.hours.length && nextHours.length < 6; i += 2) {
     const h = fc.hours[i];
-    nextHours.push({ t: `${+h.time.slice(11, 13)}h`, temp: r0(h.temp), icon: codeEmoji(h.code, h.isDay), pop: h.pop ?? 0, wind: h.wind, gust: h.gust, dir: dirLabel(h.dir), dirDeg: h.dir });
+    nextHours.push({ t: `${+h.time.slice(11, 13)}h`, temp: r0(h.temp), code: h.code, isDay: h.isDay, icon: codeEmoji(h.code, h.isDay), pop: h.pop ?? 0, wind: h.wind, gust: h.gust, dir: dirLabel(h.dir), dirDeg: h.dir });
   }
   const label = (i) => (i === 0 ? 'Auj.' : i === 1 ? 'Dem.' : dayName(fc.days[i].date));
   // Tard le soir, la journée en cours n'a presque plus d'heures : min/max sur les 24 h à venir.
@@ -108,10 +108,13 @@ export function buildWidget(fc) {
     temp: r0(cur.temp),
     feels: r0(cur.feels),
     code: cur.code,
+    isDay: cur.isDay,
     icon: codeEmoji(cur.code, cur.isDay),
     cond: codeLabel(cur.code, cur.isDay),
     wind: cur.wind,
     gust: cur.gust,
+    windKmh: r0(kmh(cur.wind)),
+    gustKmh: r0(kmh(cur.gust)),
     dir: dirLabel(cur.dir),
     dirDeg: cur.dir,
     pop: cur.pop ?? 0,
@@ -123,7 +126,7 @@ export function buildWidget(fc) {
     wave: fc.marine?.[0]?.wave != null ? r1(fc.marine[0].wave) : null,
     sources: fc.models.filter((m) => m.weight > 0).length,
     h: nextHours,
-    d: fc.days.slice(0, 7).map((d, i) => ({ day: label(i), min: r0(d.min), max: r0(d.max), icon: codeEmoji(d.code, true), pop: d.pop, wind: d.wind, gust: d.gust })),
+    d: fc.days.slice(0, 7).map((d, i) => ({ day: label(i), min: r0(d.min), max: r0(d.max), code: d.code, icon: codeEmoji(d.code, true), pop: d.pop, wind: d.wind, gust: d.gust })),
     // 24 prochaines heures pour le graphe du grand widget.
     chart: fc.hours.slice(0, 24).map((h) => ({ t: h.time, h: +h.time.slice(11, 13), code: h.code, temp: r1(h.temp), wind: h.wind, gust: h.gust, dir: h.dir, pop: h.pop ?? 0, precip: h.precip ?? 0 })),
     alerts: fc.alerts || [],

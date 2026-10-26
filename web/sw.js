@@ -1,6 +1,6 @@
 // Hors ligne : l'interface est servie depuis le cache, les données toujours depuis le réseau si possible.
-const CACHE = 'meteo-v1';
-const SHELL = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/ensemble.js', 'js/sources.js', 'js/forecast.js', 'manifest.webmanifest', 'icons/icon.svg'];
+const CACHE = 'meteo-v2';
+const SHELL = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/ensemble.js', 'js/sources.js', 'js/forecast.js', 'js/alerts.js', 'js/activities.js', 'js/scene.js', 'manifest.webmanifest', 'icons/icon.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

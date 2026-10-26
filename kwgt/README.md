@@ -22,7 +22,7 @@ https://maxencedevos83.github.io/App-meteo/data/widget.json
 | Icône (emoji) | `$wg(gv(url), json, ".icon")$` |
 | Ciel | `$wg(gv(url), json, ".cond")$` |
 | Min / max | `$wg(gv(url), json, ".min")$° / $wg(gv(url), json, ".max")$°` |
-| Vent | `$wg(gv(url), json, ".wind")$ kn raf. $wg(gv(url), json, ".gust")$ $wg(gv(url), json, ".dir")$` |
+| Vent | `$wg(gv(url), json, ".windKmh")$ km/h raf. $wg(gv(url), json, ".gustKmh")$ $wg(gv(url), json, ".dir")$` |
 | Pluie dans l'heure | `$wg(gv(url), json, ".rain")$` |
 | Probabilité de pluie | `$wg(gv(url), json, ".pop")$ %` |
 | Fiabilité | `$wg(gv(url), json, ".confidence")$ %` |

@@ -17,9 +17,12 @@ object WidgetStyle {
     const val CLOCK_SMALL = 1
     const val CLOCK_HIDDEN = 2
 
-    /** bgColor = 0 garde le dégradé bleu d'origine ; opacity et textScale en %. */
+    /** Fond aux couleurs du ciel (valeur réservée, jamais une couleur choisie : celles-ci sont opaques). */
+    const val WEATHER = 1
+
+    /** bgColor = 0 garde le dégradé bleu d'origine, WEATHER suit le ciel ; opacity et textScale en %. */
     data class Style(
-        val bgColor: Int = 0,
+        val bgColor: Int = WEATHER,
         val opacity: Int = 100,
         val textColor: Int = Color.WHITE,
         val textScale: Int = 100,
@@ -27,9 +30,12 @@ object WidgetStyle {
         val showDate: Boolean = true,
         // Prévision du widget par jour (sinon par heure).
         val daily: Boolean = true,
+        // Icône animée (sinon image fixe).
+        val animated: Boolean = true,
     )
 
     val BACKGROUNDS = listOf(
+        "Selon la météo" to WEATHER,
         "Bleu (d'origine)" to 0,
         "Noir" to Color.BLACK,
         "Anthracite" to Color.rgb(43, 47, 54),
@@ -64,6 +70,7 @@ object WidgetStyle {
             clock = p.getInt("style_clock", d.clock),
             showDate = p.getBoolean("style_date", d.showDate),
             daily = p.getBoolean("style_daily", d.daily),
+            animated = p.getBoolean("style_anim", d.animated),
         )
     }
 
@@ -76,6 +83,7 @@ object WidgetStyle {
             .putInt("style_clock", s.clock)
             .putBoolean("style_date", s.showDate)
             .putBoolean("style_daily", s.daily)
+            .putBoolean("style_anim", s.animated)
             .apply()
     }
 
@@ -114,7 +122,9 @@ object WidgetStyle {
 
     fun apply(context: Context, v: RemoteViews, layout: Int, s: Style) {
         // Filtre de couleur sur le fond arrondi : transparent (0) = dégradé d'origine conservé.
-        v.setInt(R.id.bg, "setColorFilter", s.bgColor)
+        // Le fond « selon la météo » est posé ensuite par le widget, une fois la prévision connue.
+        v.setImageViewResource(R.id.bg, R.drawable.widget_bg)
+        v.setInt(R.id.bg, "setColorFilter", if (s.bgColor == WEATHER) 0 else s.bgColor)
         v.setInt(R.id.bg, "setImageAlpha", (s.opacity.coerceIn(0, 100) * 255) / 100)
         val scale = s.textScale.coerceIn(50, 200) / 100f
         for (t in texts(context, layout)) {

@@ -37,7 +37,7 @@ L'onglet « Sources et fiabilité » de l'appli montre le poids réel de chaque 
 
 ## Alertes, sorties et mer
 
-- **Alertes** (bandeau de l'appli, et notifications du widget Android, réglables dans l'appli du widget) : vigilance Météo-France du Var (flux public MeteoAlarm), pluie dans l'heure, orage, coup de vent (rafales ≥ 30 kn sur 12 h, réglable dans `config.json` → `alerts.gustKn`), bons créneaux de sortie.
+- **Alertes** (bandeau de l'appli, et notifications du widget Android, réglables dans l'appli du widget) : vigilance Météo-France du Var (flux public MeteoAlarm), pluie dans l'heure, orage, coup de vent (rafales ≥ 55 km/h sur 12 h, réglable dans l'appli du widget ou dans `config.json` → `alerts.gustKn` en nœuds), bons créneaux de sortie.
 - **Sorties** : score heure par heure sur 5 jours et meilleurs créneaux pour kite/wing, voile, paddle/kayak, baignade et balade. Le score tient compte du vent, des rafales, de l'orientation de la plage (`shoreFacing`, 150° pour Le Lavandou : un vent de terre est pénalisé pour le kite et le paddle), des vagues, de la température de l'eau, de la pluie et de la nuit. Les seuils sont dans `web/js/activities.js`.
 - **Mer** : vagues, houle (hauteur, période, direction) et température de l'eau sur 6 jours.
 - **Vent par modèle** : tableau façon Windguru qui compare les modèles toutes les 3 h.

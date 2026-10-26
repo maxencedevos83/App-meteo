@@ -44,9 +44,9 @@ object Notifier {
         prefs(context).edit().putBoolean("notif_$type", on).apply()
     }
 
-    /** Seuil de rafales (kn) pour l'alerte vent. */
-    fun gustThreshold(context: Context) = prefs(context).getInt("gust_kn", 30)
-    fun setGustThreshold(context: Context, kn: Int) = prefs(context).edit().putInt("gust_kn", kn).apply()
+    /** Seuil de rafales pour l'alerte vent, réglé en km/h (la prévision est en nœuds). */
+    fun gustThresholdKmh(context: Context) = prefs(context).getInt("gust_kmh", 55)
+    fun setGustThresholdKmh(context: Context, kmh: Int) = prefs(context).edit().putInt("gust_kmh", kmh).apply()
 
     /** Niveau de vigilance minimal notifié : 2 = jaune, 3 = orange. */
     fun vigilanceMin(context: Context) = prefs(context).getInt("vig_min", 2)
@@ -80,7 +80,8 @@ object Notifier {
 
         if (hasTimes) {
             // Vent violent sur les 12 prochaines heures, avec le seuil choisi.
-            val threshold = gustThreshold(context)
+            val thresholdKmh = gustThresholdKmh(context)
+            val threshold = thresholdKmh / 1.852
             var first: JSONObject? = null
             var peak: JSONObject? = null
             for (i in 0 until minOf(12, chart!!.length())) {
@@ -90,12 +91,12 @@ object Notifier {
                 if (peak == null || h.optDouble("gust") > peak.optDouble("gust")) peak = h
             }
             if (first != null && peak != null) {
-                val gust = Math.round(peak.optDouble("gust"))
+                val gust = peak.optDouble("gust")
                 out.add(Alert(
-                    "vent-${first.optString("t").take(10)}-$threshold", "vent", if (gust >= threshold + 10) 3 else 2,
-                    "Vent violent : rafales $gust kn",
+                    "vent-${first.optString("t").take(10)}-$thresholdKmh", "vent", if (gust >= threshold + 10) 3 else 2,
+                    "Vent violent : rafales ${MeteoData.kmh(gust)} km/h",
                     "Dès ${hourLabel(first.optString("t"))}, maximum vers ${hourLabel(peak.optString("t"))} " +
-                        "(vent moyen ${Math.round(peak.optDouble("wind", 0.0))} kn)",
+                        "(vent moyen ${MeteoData.kmh(peak.optDouble("wind", 0.0))} km/h)",
                 ))
             }
         }
