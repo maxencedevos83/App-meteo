@@ -1,5 +1,5 @@
 import { codeEmoji, codeLabel, dirLabel, kmh, KMH } from './ensemble.js';
-import { fetchAllOpenMeteo, fetchEnsemblePop, fetchNowcast, fetchMarine, geocode } from './sources.js';
+import { fetchAllOpenMeteo, fetchEnsemblePop, fetchNowcast, fetchMarine, geocode, reverseGeocode, distanceKm } from './sources.js';
 import { buildForecast } from './forecast.js';
 import { buildAlerts, dayWord } from './alerts.js';
 import { startScene, skyKind } from './scene.js';
@@ -40,12 +40,36 @@ async function loadPlace(place) {
   return fc;
 }
 
+// Autour du lieu principal, la prévision complète (Windguru, stations) reste la meilleure.
+const HOME_RADIUS_KM = 15;
+
+function currentPosition() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error('localisation indisponible'));
+    // Précision de la ville : pas besoin du GPS fin.
+    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, maximumAge: 30 * 60000, timeout: 15000 });
+  });
+}
+
+// Mode « ma position » : ville où l'on se trouve, ou lieu principal si l'on est tout près.
+async function gpsPlace() {
+  const pos = await currentPosition();
+  const here = { latitude: +pos.coords.latitude.toFixed(3), longitude: +pos.coords.longitude.toFixed(3) };
+  const cfg = await fetch('config.json').then((r) => r.json()).catch(() => null);
+  if (cfg && distanceKm(here, cfg) <= HOME_RADIUS_KM) return null;
+  const last = store.get('gpsName');
+  const name = last && distanceKm(here, last) < 3 ? last.name : await reverseGeocode(here.latitude, here.longitude).catch(() => 'Ma position');
+  store.set('gpsName', { ...here, name });
+  return { name: `📍 ${name}`, ...here, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+}
+
 async function load() {
   const btn = $('#refresh');
   btn.classList.add('spin');
-  const other = store.get('place');
+  let other = store.get('place');
   try {
     let fc;
+    if (other?.gps) other = await gpsPlace().catch(() => store.get('gpsName') && { name: `📍 ${store.get('gpsName').name}`, ...store.get('gpsName'), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
     if (other) fc = await loadPlace(other);
     else {
       try { fc = await loadHome(); }
@@ -413,6 +437,7 @@ function setupSearch() {
   let timer;
   $('#place-btn').onclick = () => { dlg.showModal(); input.focus(); };
   $('#home-btn').onclick = () => { store.set('place', null); dlg.close(); load(); };
+  $('#gps-btn').onclick = () => { store.set('place', { gps: true }); dlg.close(); load(); };
   input.oninput = () => {
     clearTimeout(timer);
     timer = setTimeout(async () => {

@@ -32,6 +32,8 @@ import kotlin.concurrent.thread
 class MainActivity : Activity() {
 
     private lateinit var status: TextView
+    private lateinit var placeInfo: TextView
+    private lateinit var backgroundButton: Button
     private lateinit var preview: FrameLayout
     private lateinit var column: LinearLayout
     private var style = WidgetStyle.Style()
@@ -154,6 +156,24 @@ class MainActivity : Activity() {
             })
         }
 
+        section("Lieu")
+        add(CheckBox(this).apply {
+            text = "Suivre ma position (ville)"
+            isChecked = Position.follow(this@MainActivity)
+            setOnCheckedChangeListener { _, on ->
+                Position.setFollow(this@MainActivity, on)
+                if (on && !Position.granted(this@MainActivity)) askLocation() else refresh()
+                updatePlaceInfo()
+            }
+        })
+        placeInfo = TextView(this).apply { setPadding(0, (4 * dp).toInt(), 0, (4 * dp).toInt()) }
+        add(placeInfo)
+        backgroundButton = Button(this).apply {
+            text = "Actualiser aussi en arrière-plan (« Toujours autoriser »)"
+            setOnClickListener { requestPermissions(arrayOf(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION), 3) }
+        }
+        add(backgroundButton)
+
         section("Prévision")
         label("Adresse de l'appli")
         val url = EditText(this).apply {
@@ -178,6 +198,8 @@ class MainActivity : Activity() {
         setContentView(ScrollView(this).apply { addView(column) })
 
         askNotificationPermission(force = false)
+        if (Position.follow(this) && !Position.granted(this)) askLocation()
+        updatePlaceInfo()
         AlertJob.schedule(this)
 
         // Ouvert depuis l'ajout d'un widget : on valide tout de suite la configuration.
@@ -205,6 +227,39 @@ class MainActivity : Activity() {
         requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
     }
 
+    private fun askLocation() {
+        val perms = mutableListOf(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+        // Android 10 accepte les deux d'un coup ; à partir d'Android 11, « toujours » se demande à part.
+        if (Build.VERSION.SDK_INT == 29) perms.add(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        requestPermissions(perms.toTypedArray(), 2)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 2 || requestCode == 3) {
+            updatePlaceInfo()
+            refresh()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::placeInfo.isInitialized) updatePlaceInfo()
+    }
+
+    private fun updatePlaceInfo() {
+        val follow = Position.follow(this)
+        val granted = Position.granted(this)
+        val city = getSharedPreferences("meteo", MODE_PRIVATE).getString("pos_name", null)
+        placeInfo.text = when {
+            !follow -> "Le widget affiche toujours le lieu principal (Le Lavandou)."
+            !granted -> "Autorisez la localisation pour que le widget suive la ville où vous êtes."
+            else -> (city?.let { "Dernière position : $it. " } ?: "") +
+                "Près du Lavandou, prévision complète avec Windguru ; ailleurs, Météo-France, ECMWF et ICON pour la ville où vous êtes."
+        }
+        backgroundButton.visibility = if (follow && granted && !Position.backgroundGranted(this)) View.VISIBLE else View.GONE
+    }
+
     private fun update(next: WidgetStyle.Style) {
         style = next
         WidgetStyle.save(this, next)
@@ -230,6 +285,7 @@ class MainActivity : Activity() {
             if (error == null) runCatching { Notifier.notifyNew(this, data) }.onFailure { Log.e("Meteo", "Alertes", it) }
             runOnUiThread {
                 updatePreview()
+                updatePlaceInfo()
                 status.text = when {
                     data == null -> "Impossible de récupérer la prévision : $error"
                     error != null -> "Hors ligne ($error). Dernière prévision : ${data.optString("updated")}"

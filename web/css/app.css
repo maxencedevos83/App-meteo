@@ -197,3 +197,5 @@ dialog::backdrop { background: rgb(0 0 0 / 40%); }
   .hero-stats { grid-template-columns: repeat(3, 1fr); }
   .stat b { font-size: 15px; }
 }
+
+.gps { width: 100%; padding: 10px 12px; margin-bottom: 8px; border-radius: 10px; border: 1px solid var(--line, #ccd); background: transparent; color: inherit; font: inherit; cursor: pointer; text-align: left; }

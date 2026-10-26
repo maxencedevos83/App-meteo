@@ -132,7 +132,7 @@ class MeteoWidget : AppWidgetProvider() {
             v.setTextViewText(R.id.rain, "💧 ${if (rain.isNotEmpty()) rain else "${int(d, "pop")} % de pluie"}$sea")
             if (size == Size.SMALL) return v
 
-            v.setTextViewText(R.id.place, d.optString("place"))
+            v.setTextViewText(R.id.place, (if (d.optBoolean("local")) "📍 " else "") + d.optString("place"))
             v.setTextViewText(R.id.cond, d.optString("cond"))
             v.setTextViewText(R.id.minmax, "${int(d, "min")}° / ${int(d, "max")}° · ressenti ${int(d, "feels")}°")
 

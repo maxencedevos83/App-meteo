@@ -1,6 +1,7 @@
 package fr.maxence.meteo
 
 import android.content.Context
+import android.util.Log
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -24,8 +25,36 @@ object MeteoData {
 
     fun lastError(context: Context): String? = prefs(context).getString("error", null)
 
-    /** Télécharge la dernière prévision ; en cas d'échec, renvoie la dernière connue. */
+    // Autour du lieu principal, la prévision publiée (Windguru, stations, vigilance) reste la meilleure.
+    private const val HOME_RADIUS_KM = 15.0
+
+    /**
+     * Dernière prévision pour le widget : celle publiée par l'appli près du lieu principal,
+     * sinon une prévision calculée sur le téléphone pour la ville où l'on se trouve.
+     */
     fun refresh(context: Context): JSONObject? {
+        val here = if (Position.follow(context)) Position.current(context) else null
+        val home = cached(context)?.takeIf { !it.optBoolean("local") } ?: prefs(context).getString("home", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
+        val homeLat = home?.optDouble("lat", 43.1375) ?: 43.1375
+        val homeLon = home?.optDouble("lon", 6.3683) ?: 6.3683
+        if (Position.follow(context)) Log.i("Meteo", if (here == null) "Position inconnue : lieu principal" else "Position : ${here.name}")
+        if (here != null && LocalForecast.distanceKm(here.lat, here.lon, homeLat, homeLon) > HOME_RADIUS_KM) {
+            return try {
+                val json = LocalForecast.build(here.lat, here.lon, here.name)
+                Log.i("Meteo", "Prévision locale : ${here.name} ${json.optString("temp")}° ${json.optString("cond")}")
+                prefs(context).edit().putString("json", json.toString()).remove("error").apply()
+                json
+            } catch (e: Exception) {
+                Log.e("Meteo", "Prévision locale impossible", e)
+                prefs(context).edit().putString("error", e.message ?: e.javaClass.simpleName).apply()
+                cached(context)
+            }
+        }
+        return refreshHome(context)
+    }
+
+    /** Télécharge la prévision publiée du lieu principal ; en cas d'échec, renvoie la dernière connue. */
+    private fun refreshHome(context: Context): JSONObject? {
         val url = siteUrl(context) + "data/widget.json?t=" + System.currentTimeMillis()
         return try {
             val conn = (URL(url).openConnection() as HttpURLConnection).apply {
@@ -36,7 +65,7 @@ object MeteoData {
             val body = conn.inputStream.bufferedReader().use { it.readText() }
             conn.disconnect()
             val json = JSONObject(body)
-            prefs(context).edit().putString("json", body).remove("error").apply()
+            prefs(context).edit().putString("json", body).putString("home", body).remove("error").apply()
             json
         } catch (e: Exception) {
             prefs(context).edit().putString("error", e.message ?: e.javaClass.simpleName).apply()
