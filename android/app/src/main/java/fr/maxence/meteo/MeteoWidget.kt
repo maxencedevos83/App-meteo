@@ -146,9 +146,34 @@ class MeteoWidget : AppWidgetProvider() {
                 arrayOf(R.id.h4_t, R.id.h4_icon, R.id.h4_temp, R.id.h4_wind),
                 arrayOf(R.id.h5_t, R.id.h5_icon, R.id.h5_temp, R.id.h5_wind),
             )
-            // Un widget moyen peu haut n'affiche pas la ligne des heures.
-            v.setViewVisibility(R.id.hours, if (size == Size.MEDIUM && heightDp < 130 + clockDp) View.GONE else View.VISIBLE)
-            hourIds.forEachIndexed { i, ids ->
+            val days = d.optJSONArray("d")
+            // Colonne d'un jour : nom (et risque de pluie), icône, min/max, vent moyen·rafales.
+            fun fillDay(ids: Array<Int>, day: JSONObject) {
+                val pop = num(day, "pop") ?: 0.0
+                v.setTextViewText(ids[0], if (pop >= 40) "${day.optString("day")} ${Math.round(pop)}%" else day.optString("day"))
+                v.setTextViewText(ids[1], day.optString("icon"))
+                v.setTextViewText(ids[2], "${int(day, "min")}/${int(day, "max")}°")
+                val wind = num(day, "wind") ?: 0.0
+                v.setTextViewText(ids[3], "${Math.round(wind)}·${int(day, "gust")}")
+                v.setInt(ids[3], "setBackgroundColor", MeteoData.windColor(wind))
+            }
+
+            // Un widget moyen peu haut n'affiche pas la ligne des prévisions.
+            v.setViewVisibility(R.id.hours, when {
+                size == Size.MEDIUM && heightDp < 130 + clockDp -> View.GONE
+                // Le grand widget a déjà sa ligne des jours sous le graphe.
+                size == Size.LARGE && style.daily -> View.GONE
+                else -> View.VISIBLE
+            })
+            if (size == Size.MEDIUM && style.daily) {
+                // Prévision sur plusieurs jours, à partir de demain quand la journée est presque finie.
+                val hourNow = d.optString("updated").substringBefore('h').toIntOrNull() ?: 0
+                val start = if (hourNow >= 20 && days != null && days.length() > hourIds.size) 1 else 0
+                hourIds.forEachIndexed { i, ids ->
+                    val day = days?.optJSONObject(start + i)
+                    if (day != null) fillDay(ids, day) else ids.forEach { id -> v.setTextViewText(id, "") }
+                }
+            } else hourIds.forEachIndexed { i, ids ->
                 val h = hours?.optJSONObject(i) ?: return@forEachIndexed
                 val pop = num(h, "pop") ?: 0.0
                 v.setTextViewText(ids[0], if (pop >= 30) "${h.optString("t")} ${Math.round(pop)}%" else h.optString("t"))
@@ -162,11 +187,10 @@ class MeteoWidget : AppWidgetProvider() {
             if (size == Size.LARGE) {
                 val density = context.resources.displayMetrics.density
                 // Hauteur du graphe : ce qui reste une fois les autres lignes placées (≈ 250 dp, plus l'horloge).
-                val chartHeightDp = (heightDp - 250 - clockDp).coerceIn(50, 160)
+                val chartHeightDp = (heightDp - 250 - clockDp + if (style.daily) 60 else 0).coerceIn(50, 180)
                 val bmp = ChartRenderer.render(d.optJSONArray("chart"), ((widthDp - 24) * density).toInt(), (chartHeightDp * density).toInt(), density, style.textColor)
                 if (bmp != null) v.setImageViewBitmap(R.id.chart, bmp)
 
-                val days = d.optJSONArray("d")
                 val dayIds = listOf(
                     arrayOf(R.id.d0_t, R.id.d0_icon, R.id.d0_temp, R.id.d0_wind),
                     arrayOf(R.id.d1_t, R.id.d1_icon, R.id.d1_temp, R.id.d1_wind),
@@ -176,13 +200,7 @@ class MeteoWidget : AppWidgetProvider() {
                 )
                 dayIds.forEachIndexed { i, ids ->
                     val day = days?.optJSONObject(i) ?: return@forEachIndexed
-                    val pop = num(day, "pop") ?: 0.0
-                    v.setTextViewText(ids[0], if (pop >= 40) "${day.optString("day")} ${Math.round(pop)}%" else day.optString("day"))
-                    v.setTextViewText(ids[1], day.optString("icon"))
-                    v.setTextViewText(ids[2], "${int(day, "min")}/${int(day, "max")}°")
-                    val wind = num(day, "wind") ?: 0.0
-                    v.setTextViewText(ids[3], "${Math.round(wind)}·${int(day, "gust")}")
-                    v.setInt(ids[3], "setBackgroundColor", MeteoData.windColor(wind))
+                    fillDay(ids, day)
                 }
 
                 val sessions = d.optJSONArray("sessions")

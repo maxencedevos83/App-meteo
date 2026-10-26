@@ -44,7 +44,7 @@ L'onglet « Sources et fiabilité » de l'appli montre le poids réel de chaque 
 
 ## Widget Android
 
-Le widget s'adapte à sa taille : **petit** (température, vent, pluie), **moyen** (prochaines heures et alerte principale), **grand** (en plus : graphe vent/rafales/pluie/température sur 24 h, 5 jours et prochains créneaux de sortie). Redimensionne-le par appui long.
+Le widget s'adapte à sa taille : **petit** (température, vent, pluie), **moyen** (prochains jours, ou prochaines heures au choix, et alerte principale), **grand** (en plus : graphe vent/rafales/pluie/température sur 24 h, 5 jours et prochains créneaux de sortie). Redimensionne-le par appui long.
 
 - **Heure et date** : grande horloge, petite ou masquée. Un appui sur l'heure ouvre l'horloge du téléphone.
 - **Apparence** (dans l'appli « Météo fiable », avec aperçu) : couleur du fond (palette ou code #RRGGBB), opacité de 0 à 100 %, couleur du texte, taille du texte de 70 à 150 %.
