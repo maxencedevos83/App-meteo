@@ -46,6 +46,10 @@ L'onglet « Sources et fiabilité » de l'appli montre le poids réel de chaque 
 
 Le widget s'adapte à sa taille : **petit** (température, vent, pluie), **moyen** (prochaines heures et alerte principale), **grand** (en plus : graphe vent/rafales/pluie/température sur 24 h, 5 jours et prochains créneaux de sortie). Redimensionne-le par appui long.
 
+- **Heure et date** : grande horloge, petite ou masquée. Un appui sur l'heure ouvre l'horloge du téléphone.
+- **Apparence** (dans l'appli « Météo fiable », avec aperçu) : couleur du fond (palette ou code #RRGGBB), opacité de 0 à 100 %, couleur du texte, taille du texte de 70 à 150 %.
+- **Alertes** : le téléphone vérifie toutes les 15 min en arrière-plan, même si le widget n'est pas affiché. Vigilance Météo-France (dès le jaune ou dès l'orange), orages, vent violent (seuil de rafales réglable), pluie dans l'heure lue en direct sur AROME et pluie probable dans les 6 h. Les alertes orange, rouge, orage et tempête passent par un canal prioritaire. Bouton « Tester une notification » ; pour des alertes à l'heure, autorise l'appli à ne pas être restreinte par l'économie de batterie.
+
 ## Fonctionnement technique
 
 - `scripts/update.mjs` tourne toutes les 30 min dans GitHub Actions (`.github/workflows/update.yml`). Il récupère toutes les sources, calcule la prévision, met à jour l'état de vérification (branche `data`) et publie le site sur GitHub Pages avec `data/forecast.json` et `data/widget.json`.

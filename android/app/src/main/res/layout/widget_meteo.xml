@@ -1,11 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
     android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Fond séparé : sa couleur et sa transparence sont réglables depuis l'appli. -->
+    <ImageView
+        android:id="@+id/bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_bg" />
+
+<LinearLayout
+    android:id="@+id/content"
+    android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_bg"
     android:orientation="vertical"
     android:padding="12dp">
+
+    <LinearLayout
+        android:id="@+id/clock_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="bottom"
+        android:orientation="horizontal">
+        <TextClock
+            android:id="@+id/clock"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-light"
+            android:format12Hour="HH:mm"
+            android:format24Hour="HH:mm"
+            android:includeFontPadding="false"
+            android:textColor="#FFFFFF"
+            android:textSize="44sp" />
+        <TextClock
+            android:id="@+id/date"
+            style="@style/WText"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:paddingBottom="5dp"
+            android:ellipsize="end"
+            android:format12Hour="EEEE d MMMM"
+            android:format24Hour="EEEE d MMMM"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -36,6 +80,7 @@
             android:layout_weight="1"
             android:gravity="end"
             android:orientation="vertical">
+            <TextClock android:id="@+id/clock_small" style="@style/WText" android:textStyle="bold" android:textSize="15sp" android:format12Hour="HH:mm" android:format24Hour="HH:mm" android:visibility="gone" />
             <TextView android:id="@+id/place" style="@style/WText" android:textStyle="bold" android:text="Météo fiable" />
             <TextView android:id="@+id/cond" style="@style/WText" android:text="Chargement…" />
             <TextView android:id="@+id/minmax" style="@style/WSmall" android:text="" />
@@ -170,3 +215,4 @@
             android:text="⟳" />
     </LinearLayout>
 </LinearLayout>
+</FrameLayout>

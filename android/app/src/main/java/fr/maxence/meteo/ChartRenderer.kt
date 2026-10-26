@@ -10,7 +10,7 @@ import org.json.JSONArray
 /** Graphe des 24 prochaines heures : barres de vent colorées, rafales, pluie et courbe de température. */
 object ChartRenderer {
 
-    fun render(chart: JSONArray?, widthPx: Int, heightPx: Int, density: Float): Bitmap? {
+    fun render(chart: JSONArray?, widthPx: Int, heightPx: Int, density: Float, textColor: Int = Color.WHITE): Bitmap? {
         if (chart == null || chart.length() < 2 || widthPx <= 0 || heightPx <= 0) return null
         val bmp = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
@@ -29,9 +29,9 @@ object ChartRenderer {
         }
 
         val bar = Paint(Paint.ANTI_ALIAS_FLAG)
-        val gustPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(200, 255, 255, 255); strokeWidth = 2 * density }
+        val gustPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = (textColor and 0xFFFFFF) or (200 shl 24); strokeWidth = 2 * density }
         val rain = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(230, 90, 170, 255) }
-        val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(220, 255, 255, 255); textSize = 10 * density; textAlign = Paint.Align.CENTER }
+        val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = (textColor and 0xFFFFFF) or (220 shl 24); textSize = 10 * density; textAlign = Paint.Align.CENTER }
         val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.rgb(255, 200, 120); style = Paint.Style.STROKE; strokeWidth = 2 * density; strokeJoin = Paint.Join.ROUND
         }
