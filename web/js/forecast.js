@@ -101,6 +101,8 @@ export function buildWidget(fc) {
   };
   return {
     place: fc.place,
+    lat: fc.latitude,
+    lon: fc.longitude,
     updated: fc.now.slice(11, 16).replace(':', 'h'),
     updatedIso: fc.generatedAt,
     temp: r0(cur.temp),
@@ -123,7 +125,7 @@ export function buildWidget(fc) {
     h: nextHours,
     d: fc.days.slice(0, 5).map((d, i) => ({ day: label(i), min: r0(d.min), max: r0(d.max), icon: codeEmoji(d.code, true), pop: d.pop, wind: d.wind, gust: d.gust })),
     // 24 prochaines heures pour le graphe du grand widget.
-    chart: fc.hours.slice(0, 24).map((h) => ({ h: +h.time.slice(11, 13), temp: r1(h.temp), wind: h.wind, gust: h.gust, dir: h.dir, pop: h.pop ?? 0, precip: h.precip ?? 0 })),
+    chart: fc.hours.slice(0, 24).map((h) => ({ t: h.time, h: +h.time.slice(11, 13), code: h.code, temp: r1(h.temp), wind: h.wind, gust: h.gust, dir: h.dir, pop: h.pop ?? 0, precip: h.precip ?? 0 })),
     alerts: fc.alerts || [],
     sessions: (fc.activities || []).filter((a) => a.windows.length).map((a) => {
       const w = a.windows.find((x) => x.end >= fc.now.slice(0, 13) + ':00') || a.windows[0];

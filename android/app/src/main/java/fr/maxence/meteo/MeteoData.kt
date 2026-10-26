@@ -44,6 +44,23 @@ object MeteoData {
         }
     }
 
+    /**
+     * Pluie de la prochaine heure par quarts d'heure (AROME, via Open-Meteo), lue directement par le téléphone :
+     * plus récente que la prévision publiée toutes les 30 min. Renvoie (heure locale, mm) ou null si indisponible.
+     */
+    fun nowcast(lat: Double, lon: Double): List<Pair<String, Double>>? = try {
+        val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
+            "&minutely_15=precipitation&forecast_minutely_15=5&timezone=auto"
+        val conn = (URL(url).openConnection() as HttpURLConnection).apply { connectTimeout = 10000; readTimeout = 10000 }
+        val m = JSONObject(conn.inputStream.bufferedReader().use { it.readText() }).getJSONObject("minutely_15")
+        conn.disconnect()
+        val times = m.getJSONArray("time")
+        val mm = m.getJSONArray("precipitation")
+        (0 until times.length()).map { times.getString(it) to mm.optDouble(it, 0.0) }
+    } catch (e: Exception) {
+        null
+    }
+
     // Échelle de couleurs du vent (nœuds), proche de Windguru.
     private val STOPS = listOf(
         0 to intArrayOf(255, 255, 255), 5 to intArrayOf(200, 245, 255), 9 to intArrayOf(120, 230, 160),

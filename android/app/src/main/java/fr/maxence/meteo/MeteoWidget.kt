@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.provider.AlarmClock
 import android.view.View
 import android.widget.RemoteViews
 import org.json.JSONObject
@@ -16,6 +17,7 @@ import kotlin.concurrent.thread
 class MeteoWidget : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
+        AlertJob.schedule(context)
         refreshAsync(context)
     }
 
@@ -41,7 +43,7 @@ class MeteoWidget : AppWidgetProvider() {
         }
     }
 
-    private enum class Size { SMALL, MEDIUM, LARGE }
+    enum class Size { SMALL, MEDIUM, LARGE }
 
     companion object {
         const val ACTION_REFRESH = "fr.maxence.meteo.REFRESH"
@@ -65,7 +67,7 @@ class MeteoWidget : AppWidgetProvider() {
             }
         }
 
-        private fun build(context: Context, d: JSONObject?, size: Size, widthDp: Int, heightDp: Int): RemoteViews {
+        fun build(context: Context, d: JSONObject?, size: Size, widthDp: Int, heightDp: Int): RemoteViews {
             val layout = when (size) {
                 Size.SMALL -> R.layout.widget_small
                 Size.MEDIUM -> R.layout.widget_meteo
@@ -76,6 +78,23 @@ class MeteoWidget : AppWidgetProvider() {
             v.setOnClickPendingIntent(R.id.root, PendingIntent.getActivity(context, 0, open, PendingIntent.FLAG_IMMUTABLE))
             val refresh = Intent(context, MeteoWidget::class.java).setAction(ACTION_REFRESH)
             v.setOnClickPendingIntent(R.id.refresh, PendingIntent.getBroadcast(context, 1, refresh, PendingIntent.FLAG_IMMUTABLE))
+
+            // Apparence choisie dans l'appli, et horloge (un appui ouvre l'horloge du téléphone).
+            val style = WidgetStyle.load(context)
+            WidgetStyle.apply(context, v, layout, style)
+            val alarms = PendingIntent.getActivity(context, 3, Intent(AlarmClock.ACTION_SHOW_ALARMS), PendingIntent.FLAG_IMMUTABLE)
+            v.setOnClickPendingIntent(R.id.clock_small, alarms)
+            val bigClock = size != Size.SMALL && style.clock == WidgetStyle.CLOCK_BIG
+            if (size == Size.SMALL) {
+                v.setViewVisibility(R.id.clock_small, if (style.clock == WidgetStyle.CLOCK_HIDDEN) View.GONE else View.VISIBLE)
+            } else {
+                v.setViewVisibility(R.id.clock_row, if (bigClock) View.VISIBLE else View.GONE)
+                v.setViewVisibility(R.id.date, if (style.showDate) View.VISIBLE else View.GONE)
+                v.setViewVisibility(R.id.clock_small, if (style.clock == WidgetStyle.CLOCK_SMALL) View.VISIBLE else View.GONE)
+                v.setOnClickPendingIntent(R.id.clock_row, alarms)
+            }
+            // Place prise par la grande horloge, selon la taille du texte.
+            val clockDp = if (bigClock) 56 * style.textScale / 100 else 0
 
             if (d == null) {
                 if (size == Size.SMALL) {
@@ -128,7 +147,7 @@ class MeteoWidget : AppWidgetProvider() {
                 arrayOf(R.id.h5_t, R.id.h5_icon, R.id.h5_temp, R.id.h5_wind),
             )
             // Un widget moyen peu haut n'affiche pas la ligne des heures.
-            v.setViewVisibility(R.id.hours, if (size == Size.MEDIUM && heightDp < 130) View.GONE else View.VISIBLE)
+            v.setViewVisibility(R.id.hours, if (size == Size.MEDIUM && heightDp < 130 + clockDp) View.GONE else View.VISIBLE)
             hourIds.forEachIndexed { i, ids ->
                 val h = hours?.optJSONObject(i) ?: return@forEachIndexed
                 val pop = num(h, "pop") ?: 0.0
@@ -142,9 +161,9 @@ class MeteoWidget : AppWidgetProvider() {
 
             if (size == Size.LARGE) {
                 val density = context.resources.displayMetrics.density
-                // Hauteur du graphe : ce qui reste une fois les autres lignes placées (≈ 250 dp).
-                val chartHeightDp = (heightDp - 250).coerceIn(60, 160)
-                val bmp = ChartRenderer.render(d.optJSONArray("chart"), ((widthDp - 24) * density).toInt(), (chartHeightDp * density).toInt(), density)
+                // Hauteur du graphe : ce qui reste une fois les autres lignes placées (≈ 250 dp, plus l'horloge).
+                val chartHeightDp = (heightDp - 250 - clockDp).coerceIn(50, 160)
+                val bmp = ChartRenderer.render(d.optJSONArray("chart"), ((widthDp - 24) * density).toInt(), (chartHeightDp * density).toInt(), density, style.textColor)
                 if (bmp != null) v.setImageViewBitmap(R.id.chart, bmp)
 
                 val days = d.optJSONArray("d")
