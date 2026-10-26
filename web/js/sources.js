@@ -93,6 +93,20 @@ export async function fetchMarine(lat, lon, timeZone, fetchImpl) {
   }));
 }
 
+// Nom de la ville à partir de coordonnées (service gratuit prévu pour être appelé depuis le navigateur).
+export async function reverseGeocode(lat, lon, fetchImpl) {
+  const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=fr`;
+  const json = await getJson(url, fetchImpl);
+  return json.city || json.locality || json.principalSubdivision || 'Ma position';
+}
+
+export function distanceKm(a, b) {
+  const R = 6371, rad = Math.PI / 180;
+  const dLat = (b.latitude - a.latitude) * rad, dLon = (b.longitude - a.longitude) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.latitude * rad) * Math.cos(b.latitude * rad) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
 export async function geocode(query, fetchImpl) {
   const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=6&language=fr&format=json`;
   const json = await getJson(url, fetchImpl);
