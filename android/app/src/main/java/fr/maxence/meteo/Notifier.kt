@@ -28,7 +28,7 @@ object Notifier {
         Triple("orage", "Orages", true),
         Triple("vent", "Vent violent", true),
         Triple("pluie", "Pluie (dans l'heure et dans les 6 h)", true),
-        Triple("session", "Bons créneaux de sortie (kite, voile, paddle)", true),
+        Triple("session", "Bons créneaux de sortie en bateau", true),
     )
 
     class Alert(val id: String, val type: String, val level: Int, val title: String, val text: String)
@@ -59,7 +59,9 @@ object Notifier {
     }
 
     /** Toutes les alertes en cours, calculées à partir de la prévision publiée et des mesures en direct. */
-    fun collect(context: Context, data: JSONObject, withNowcast: Boolean = true): List<Alert> {
+    fun collect(context: Context, raw: JSONObject, withNowcast: Boolean = true): List<Alert> {
+        // Les « prochaines heures » comptent à partir de maintenant, même si la prévision publiée date un peu.
+        val data = runCatching { MeteoData.fresh(raw) }.getOrDefault(raw)
         val out = mutableListOf<Alert>()
         val chart = data.optJSONArray("chart")
         val hasTimes = chart != null && chart.length() > 0 && chart.getJSONObject(0).has("t")

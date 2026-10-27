@@ -1,6 +1,7 @@
 // Assemble la prévision finale (appli) et le résumé compact (widgets).
 import { combine, daily, codeLabel, codeEmoji, dirLabel, localKey, kmh } from './ensemble.js';
 import { buildActivities } from './activities.js';
+import { skyDay } from './astro.js';
 
 const r1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
 const r0 = (v) => (v == null ? null : Math.round(v));
@@ -34,12 +35,16 @@ export function rainNextHour(minutely, nowKey) {
 export function buildForecast({ config, sources, ensemblePop = {}, nowcast = null, marine = null, skill = {}, scores = null, errors = [], now = new Date() }) {
   const nowKey = localKey(now, config.timezone);
   const { hours, weights } = combine(sources, { now: nowKey, skill, ensemblePop });
-  const sun = nowcast?.sun || [];
-  for (const h of hours) h.isDay = isDayAt(h.time, sun);
   const days = daily(hours);
+  // Soleil et lune calculés pour le lieu (sans dépendre d'un service).
+  const sky = new Map(days.map((d) => [d.date, skyDay(d.date, config.latitude, config.longitude, config.timezone)]));
+  const sun = nowcast?.sun?.length ? nowcast.sun : [...sky.values()].map((x) => ({ date: x.date, sunrise: `${x.date}T${x.sunrise}`, sunset: `${x.date}T${x.sunset}` }));
+  for (const h of hours) h.isDay = isDayAt(h.time, sun);
   for (const d of days) {
-    const s = sun.find((x) => x.date === d.date);
-    if (s) { d.sunrise = s.sunrise.slice(11); d.sunset = s.sunset.slice(11); d.uv = s.uv; }
+    const { date, ...k } = sky.get(d.date);
+    Object.assign(d, k);
+    const s = nowcast?.sun?.find((x) => x.date === d.date);
+    if (s) d.uv = s.uv;
   }
 
   // Détail par modèle sur 48 h, pour comparer les sources.
@@ -61,6 +66,7 @@ export function buildForecast({ config, sources, ensemblePop = {}, nowcast = nul
     latitude: config.latitude,
     longitude: config.longitude,
     timezone: config.timezone,
+    shoreFacing: config.shoreFacing ?? 180,
     now: nowKey,
     rain: rainNextHour(nowcast?.minutely, nowKey),
     hours: hours.map((h) => ({
@@ -75,6 +81,26 @@ export function buildForecast({ config, sources, ensemblePop = {}, nowcast = nul
     models,
     scores,
     errors,
+  };
+}
+
+// Recale une prévision déjà calculée sur l'heure actuelle : GitHub ne lance pas toujours la mise à jour
+// toutes les 30 min, et une prévision vieille de quelques heures afficherait encore la nuit au matin.
+export function freshen(fc, now = new Date()) {
+  const nowKey = localKey(now, fc.timezone);
+  const hourKey = nowKey.slice(0, 13) + ':00';
+  const skip = fc.hours.findIndex((h) => h.time >= hourKey);
+  if (skip <= 0) return { ...fc, now: nowKey > fc.now ? nowKey : fc.now };
+  const today = nowKey.slice(0, 10);
+  return {
+    ...fc,
+    now: nowKey,
+    hours: fc.hours.slice(skip),
+    days: fc.days.filter((d) => d.date >= today),
+    marine: fc.marine?.filter((m) => m.time >= hourKey) ?? fc.marine,
+    // La pluie dans l'heure n'a plus de sens après une heure.
+    rain: now - Date.parse(fc.generatedAt) < 3600000 ? fc.rain : { text: null, slots: [] },
+    activities: (fc.activities || []).map((a) => ({ ...a, scores: a.scores.slice(skip), windows: a.windows.filter((w) => w.end >= hourKey) })),
   };
 }
 
@@ -126,9 +152,14 @@ export function buildWidget(fc) {
     wave: fc.marine?.[0]?.wave != null ? r1(fc.marine[0].wave) : null,
     sources: fc.models.filter((m) => m.weight > 0).length,
     h: nextHours,
-    d: fc.days.slice(0, 7).map((d, i) => ({ day: label(i), min: r0(d.min), max: r0(d.max), code: d.code, icon: codeEmoji(d.code, true), pop: d.pop, wind: d.wind, gust: d.gust })),
-    // 24 prochaines heures pour le graphe du grand widget.
-    chart: fc.hours.slice(0, 24).map((h) => ({ t: h.time, h: +h.time.slice(11, 13), code: h.code, temp: r1(h.temp), wind: h.wind, gust: h.gust, dir: h.dir, pop: h.pop ?? 0, precip: h.precip ?? 0 })),
+    sunrise: today.sunrise,
+    sunset: today.sunset,
+    moonrise: today.moonrise,
+    moonset: today.moonset,
+    moon: today.emoji,
+    d: fc.days.slice(0, 7).map((d, i) => ({ day: label(i), date: d.date, sunrise: d.sunrise, sunset: d.sunset, min: r0(d.min), max: r0(d.max), code: d.code, icon: codeEmoji(d.code, true), pop: d.pop, wind: d.wind, gust: d.gust })),
+    // 48 prochaines heures : le widget s'en sert pour se recaler sur l'heure actuelle et pour les alertes.
+    chart: fc.hours.slice(0, 48).map((h) => ({ t: h.time, h: +h.time.slice(11, 13), code: h.code, isDay: h.isDay, temp: r1(h.temp), feels: r1(h.feels), wind: h.wind, gust: h.gust, dir: h.dir, pop: h.pop ?? 0, precip: h.precip ?? 0 })),
     alerts: fc.alerts || [],
     sessions: (fc.activities || []).filter((a) => a.windows.length).map((a) => {
       const w = a.windows.find((x) => x.end >= fc.now.slice(0, 13) + ':00') || a.windows[0];

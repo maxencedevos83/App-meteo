@@ -199,3 +199,33 @@ dialog::backdrop { background: rgb(0 0 0 / 40%); }
 }
 
 .gps { width: 100%; padding: 10px 12px; margin-bottom: 8px; border-radius: 10px; border: 1px solid var(--line, #ccd); background: transparent; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+
+/* Soleil et lune */
+.hero-sky { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 12px; font-size: 13px; position: relative; }
+.hero-sky b { font-weight: 600; }
+.days .sky { color: var(--muted); }
+
+/* Radar : onglets pluie / vent */
+.tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+#wind-map iframe { width: 100%; height: 100%; border: 0; }
+
+/* Sources repliées */
+details.fold > summary { cursor: pointer; list-style: none; margin-bottom: 0; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold[open] > summary { margin-bottom: 10px; }
+details.fold[open] > summary .hint { display: none; }
+.sub { font-size: 14px; margin: 16px 0 8px; }
+.sub small { color: var(--muted); font-weight: 400; }
+
+/* Lieux suivis */
+.search ul.tracked { margin: 4px 0 8px; border-bottom: 1px solid var(--line); }
+
+/* Drapeau de baignade estimé */
+.flag { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: var(--bg); margin-bottom: 12px; font-size: 14px; }
+.flag i { flex: none; width: 14px; height: 22px; margin-top: 2px; border-left: 2px solid var(--muted); position: relative; }
+.flag i::after { content: ''; position: absolute; left: 0; top: 0; width: 14px; height: 10px; background: var(--flag); }
+.flag small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.flag.f0 { --flag: #2fa84f; }
+.flag.f1 { --flag: #f2c200; }
+.flag.f2 { --flag: #e03131; }

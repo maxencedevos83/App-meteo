@@ -27,6 +27,7 @@
   <dialog id="place-dialog">
     <form method="dialog" class="search">
       <button type="button" id="gps-btn" class="gps">📍 Suivre ma position (ville)</button>
+      <ul id="tracked" class="tracked"></ul>
       <input id="search-input" type="search" placeholder="Ville, plage, spot…" autocomplete="off">
       <ul id="search-results"></ul>
       <div class="dialog-actions">
@@ -44,8 +45,7 @@
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>48 prochaines heures</h2><span class="hint">bande = écart entre modèles</span></div>
-      <div id="chart" class="chart"></div>
+      <div class="card-head"><h2>48 prochaines heures</h2></div>
       <div id="hourly" class="hourly"></div>
     </section>
 
@@ -54,34 +54,35 @@
       <div id="wind" class="wind-table"></div>
     </section>
 
-    <section class="card" id="sessions-card">
-      <div class="card-head"><h2>Sorties</h2><span class="hint">meilleurs créneaux sur 5 jours</span></div>
-      <div id="sessions" class="sessions"></div>
-    </section>
-
-    <section class="card">
-      <div class="card-head"><h2>Vent par modèle</h2><span class="hint">km/h, toutes les 3 h</span></div>
-      <div id="models-cmp" class="wind-table"></div>
-    </section>
-
-    <section class="card">
-      <div class="card-head"><h2>Radar pluie</h2><span class="hint" id="radar-time"></span></div>
-      <div id="radar" class="radar"></div>
-      <div class="radar-controls">
-        <button id="radar-play" class="chip">▶ Animer</button>
-        <input id="radar-slider" type="range" min="0" max="0" value="0" aria-label="Heure du radar">
-      </div>
-    </section>
-
     <section class="card">
       <div class="card-head"><h2>10 jours</h2></div>
       <div id="days" class="days"></div>
     </section>
 
+    <section class="card" id="sessions-card">
+      <div class="card-head"><h2>Sorties</h2><span class="hint">meilleurs créneaux sur 5 jours</span></div>
+      <div id="sessions" class="sessions"></div>
+    </section>
+
     <section class="card" id="sea-card" hidden>
-      <div class="card-head"><h2>Mer</h2></div>
+      <div class="card-head"><h2>Température de l'eau et mer</h2></div>
+      <div id="flag" class="flag" hidden></div>
       <div id="sea" class="sea"></div>
       <div id="sea-days" class="wind-table sea-days"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Radar</h2><span class="hint" id="radar-time"></span></div>
+      <div class="tabs" role="tablist">
+        <button id="tab-rain" class="chip on" role="tab" aria-selected="true">🌧 Pluie</button>
+        <button id="tab-wind" class="chip" role="tab" aria-selected="false">💨 Vent</button>
+      </div>
+      <div id="radar" class="radar"></div>
+      <div id="wind-map" class="radar" hidden></div>
+      <div class="radar-controls" id="radar-controls">
+        <button id="radar-play" class="chip">▶ Animer</button>
+        <input id="radar-slider" type="range" min="0" max="0" value="0" aria-label="Heure du radar">
+      </div>
     </section>
 
     <section class="card" id="history-card" hidden>
@@ -92,12 +93,14 @@
       <p class="explain" id="history-src"></p>
     </section>
 
-    <section class="card">
-      <div class="card-head"><h2>Sources et fiabilité</h2></div>
+    <details class="card fold">
+      <summary class="card-head"><h2>Sources et fiabilité</h2><span class="hint">toucher pour afficher</span></summary>
       <p class="explain" id="explain"></p>
       <div id="sources" class="sources"></div>
+      <h3 class="sub">Vent par modèle <small>km/h, toutes les 3 h</small></h3>
+      <div id="models-cmp" class="wind-table"></div>
       <details class="errors" id="errors" hidden><summary>Avertissements</summary><ul></ul></details>
-    </section>
+    </details>
   </main>
 
   <footer class="foot">

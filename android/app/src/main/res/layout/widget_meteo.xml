@@ -132,6 +132,16 @@
         android:ellipsize="end"
         android:text="" />
 
+    <!-- Lever et coucher du soleil et de la lune. -->
+    <TextView
+        android:id="@+id/sky"
+        style="@style/WSmall"
+        android:layout_width="match_parent"
+        android:layout_marginTop="3dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:text="" />
+
     <LinearLayout
         android:id="@+id/hours"
         android:layout_width="match_parent"

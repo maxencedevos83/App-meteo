@@ -34,28 +34,48 @@ object MeteoData {
      */
     fun refresh(context: Context): JSONObject? {
         val here = if (Position.follow(context)) Position.current(context) else null
-        val home = cached(context)?.takeIf { !it.optBoolean("local") } ?: prefs(context).getString("home", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
-        val homeLat = home?.optDouble("lat", 43.1375) ?: 43.1375
-        val homeLon = home?.optDouble("lon", 6.3683) ?: 6.3683
         if (Position.follow(context)) Log.i("Meteo", if (here == null) "Position inconnue : lieu principal" else "Position : ${here.name}")
-        if (here != null && LocalForecast.distanceKm(here.lat, here.lon, homeLat, homeLon) > HOME_RADIUS_KM) {
-            return try {
-                val json = LocalForecast.build(here.lat, here.lon, here.name)
-                Log.i("Meteo", "Prévision locale : ${here.name} ${json.optString("temp")}° ${json.optString("cond")}")
-                prefs(context).edit().putString("json", json.toString()).remove("error").apply()
-                json
-            } catch (e: Exception) {
-                Log.e("Meteo", "Prévision locale impossible", e)
-                prefs(context).edit().putString("error", e.message ?: e.javaClass.simpleName).apply()
-                cached(context)
-            }
+        if (here == null) return refreshHome(context, "data/")
+        // Près d'un lieu suivi par l'appli (Le Lavandou, Cambrils…) : sa prévision complète publiée.
+        val near = places(context).minByOrNull { LocalForecast.distanceKm(here.lat, here.lon, it.lat, it.lon) }
+            ?.takeIf { LocalForecast.distanceKm(here.lat, here.lon, it.lat, it.lon) <= HOME_RADIUS_KM }
+        if (near != null) {
+            Log.i("Meteo", "Lieu suivi : ${near.name}")
+            return refreshHome(context, near.path)
         }
-        return refreshHome(context)
+        return try {
+            val json = LocalForecast.build(here.lat, here.lon, here.name)
+            Log.i("Meteo", "Prévision locale : ${here.name} ${json.optString("temp")}° ${json.optString("cond")}")
+            prefs(context).edit().putString("json", json.toString()).remove("error").apply()
+            json
+        } catch (e: Exception) {
+            Log.e("Meteo", "Prévision locale impossible", e)
+            prefs(context).edit().putString("error", e.message ?: e.javaClass.simpleName).apply()
+            cached(context)
+        }
     }
 
-    /** Télécharge la prévision publiée du lieu principal ; en cas d'échec, renvoie la dernière connue. */
-    private fun refreshHome(context: Context): JSONObject? {
-        val url = siteUrl(context) + "data/widget.json?t=" + System.currentTimeMillis()
+    class Tracked(val name: String, val lat: Double, val lon: Double, val path: String)
+
+    /** Lieux suivis par l'appli (data/places.json), gardés en cache ; à défaut, Le Lavandou. */
+    private fun places(context: Context): List<Tracked> {
+        val body = runCatching {
+            val conn = (URL(siteUrl(context) + "data/places.json?t=" + System.currentTimeMillis()).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 10000; readTimeout = 10000
+            }
+            conn.inputStream.bufferedReader().use { it.readText() }.also { conn.disconnect() }
+        }.getOrNull()
+        if (body != null) prefs(context).edit().putString("places", body).apply()
+        val arr = runCatching { org.json.JSONArray(body ?: prefs(context).getString("places", null)) }.getOrNull()
+            ?: return listOf(Tracked("Le Lavandou", 43.1375, 6.3683, "data/"))
+        return (0 until arr.length()).map { arr.getJSONObject(it) }.map {
+            Tracked(it.optString("place"), it.optDouble("latitude"), it.optDouble("longitude"), it.optString("path", "data/"))
+        }
+    }
+
+    /** Télécharge la prévision publiée d'un lieu suivi ; en cas d'échec, renvoie la dernière connue. */
+    private fun refreshHome(context: Context, path: String): JSONObject? {
+        val url = siteUrl(context) + path + "widget.json?t=" + System.currentTimeMillis()
         return try {
             val conn = (URL(url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 15000
@@ -65,7 +85,7 @@ object MeteoData {
             val body = conn.inputStream.bufferedReader().use { it.readText() }
             conn.disconnect()
             val json = JSONObject(body)
-            prefs(context).edit().putString("json", body).putString("home", body).remove("error").apply()
+            prefs(context).edit().putString("json", body).remove("error").apply()
             json
         } catch (e: Exception) {
             prefs(context).edit().putString("error", e.message ?: e.javaClass.simpleName).apply()
@@ -88,6 +108,67 @@ object MeteoData {
         (0 until times.length()).map { times.getString(it) to mm.optDouble(it, 0.0) }
     } catch (e: Exception) {
         null
+    }
+
+    /**
+     * Prévision recalée sur l'heure actuelle : la mise à jour publiée peut dater de quelques heures
+     * (GitHub ne la lance pas toujours toutes les 30 min), et afficherait alors encore la nuit au matin.
+     * Les valeurs de l'heure en cours sont reprises de la courbe horaire, le jour et la nuit recalculés ici.
+     */
+    fun fresh(d: JSONObject, now: Long = System.currentTimeMillis()): JSONObject {
+        val out = JSONObject(d.toString())
+        val lat = out.optDouble("lat", 43.1375)
+        val lon = out.optDouble("lon", 6.3683)
+        val isDayNow = Astro.isDay(now, lat, lon)
+        out.put("isDay", isDayNow)
+        val fmt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:00", java.util.Locale.ROOT)
+        val hourKey = fmt.format(java.util.Date(now))
+        val chart = out.optJSONArray("chart")
+        val idx = if (chart == null) -1 else (0 until chart.length()).firstOrNull { chart.getJSONObject(it).optString("t") >= hourKey } ?: -1
+        if (chart != null && idx > 0) {
+            val next = org.json.JSONArray()
+            for (i in idx until chart.length()) next.put(chart.getJSONObject(i))
+            out.put("chart", next)
+            val cur = next.getJSONObject(0)
+            val code = cur.optInt("code", out.optInt("code", 3))
+            out.put("code", code)
+            out.put("cond", LocalForecast.codeLabel(code, isDayNow))
+            for (k in listOf("temp", "wind", "gust", "pop")) if (cur.has(k) && !cur.isNull(k)) out.put(k, cur.get(k))
+            if (cur.has("feels") && !cur.isNull("feels")) out.put("feels", cur.get("feels"))
+            if (cur.has("dir") && !cur.isNull("dir")) {
+                out.put("dirDeg", cur.getDouble("dir"))
+                out.put("dir", LocalForecast.dirLabel(cur.getDouble("dir")))
+            }
+            // La pluie « dans l'heure » publiée n'est plus d'actualité.
+            out.put("rain", "")
+            val hours = org.json.JSONArray()
+            var i = 1
+            while (i < next.length() && hours.length() < 6) {
+                val h = next.getJSONObject(i)
+                val t = h.optString("t")
+                val ms = runCatching { fmt.parse(t)!!.time }.getOrNull() ?: now
+                hours.put(JSONObject().put("t", "${t.substring(11, 13).toInt()}h").put("temp", h.opt("temp")).put("code", h.optInt("code", 3))
+                    .put("isDay", Astro.isDay(ms + 1_800_000, lat, lon)).put("pop", h.opt("pop")).put("wind", h.opt("wind"))
+                    .put("gust", h.opt("gust")).put("dirDeg", h.opt("dir")))
+                i += 2
+            }
+            out.put("h", hours)
+        }
+        // Jours passés retirés.
+        val days = out.optJSONArray("d")
+        if (days != null && days.length() > 0 && days.getJSONObject(0).has("date")) {
+            val today = hourKey.take(10)
+            val kept = org.json.JSONArray()
+            for (j in 0 until days.length()) days.getJSONObject(j).let { if (it.optString("date") >= today) kept.put(it) }
+            if (kept.length() > 0) {
+                if (kept.getJSONObject(0).optString("date") == today && kept.length() < days.length()) {
+                    kept.getJSONObject(0).put("day", "Auj.")
+                    if (kept.length() > 1) kept.getJSONObject(1).put("day", "Dem.")
+                }
+                out.put("d", kept)
+            }
+        }
+        return out
     }
 
     /** Le vent est publié en nœuds (unité des modèles) et affiché en km/h. */
