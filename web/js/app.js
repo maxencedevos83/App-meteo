@@ -4,6 +4,7 @@ import { buildForecast, freshen } from './forecast.js';
 import { skyDay } from './astro.js';
 import { buildAlerts, dayWord } from './alerts.js';
 import { startScene, skyKind } from './scene.js';
+import { beachFlag } from './activities.js';
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -19,8 +20,15 @@ let current = null;
 
 // ---------- Chargement ----------
 
-async function loadHome() {
-  const res = await fetch(`data/forecast.json?t=${Date.now()}`, { cache: 'no-store' });
+// Lieux suivis par le serveur (prévision complète : Windguru, stations, vigilance).
+let placesCache = null;
+async function trackedPlaces() {
+  if (!placesCache) placesCache = await fetch(`data/places.json?t=${Date.now()}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+  return placesCache;
+}
+
+async function loadHome(path = 'data/') {
+  const res = await fetch(`${path}forecast.json?t=${Date.now()}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('prévision du serveur indisponible');
   return res.json();
 }
@@ -56,6 +64,9 @@ function currentPosition() {
 async function gpsPlace() {
   const pos = await currentPosition();
   const here = { latitude: +pos.coords.latitude.toFixed(3), longitude: +pos.coords.longitude.toFixed(3) };
+  // Près d'un lieu suivi (Le Lavandou, Cambrils…) : sa prévision complète.
+  const near = (await trackedPlaces()).find((p) => distanceKm(here, p) <= HOME_RADIUS_KM);
+  if (near) return { tracked: near.path };
   const cfg = await fetch('config.json').then((r) => r.json()).catch(() => null);
   if (cfg && distanceKm(here, cfg) <= HOME_RADIUS_KM) return null;
   const last = store.get('gpsName');
@@ -71,7 +82,8 @@ async function load() {
   try {
     let fc;
     if (other?.gps) other = await gpsPlace().catch(() => store.get('gpsName') && { name: `📍 ${store.get('gpsName').name}`, ...store.get('gpsName'), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
-    if (other) fc = await loadPlace(other);
+    if (other?.tracked) fc = await loadHome(other.tracked);
+    else if (other) fc = await loadPlace(other);
     else {
       try { fc = await loadHome(); }
       catch (e) {
@@ -112,6 +124,7 @@ function render(fc) {
   renderModels(fc);
   renderDays(fc.days);
   renderSea(fc.marine);
+  renderFlag(fc);
   renderHistory(fc);
   renderSources(fc);
   radar.center(fc.latitude, fc.longitude);
@@ -257,6 +270,15 @@ function renderModels(fc) {
   </table>`;
 }
 
+function renderFlag(fc) {
+  const f = beachFlag(fc.hours[0], fc.marine?.[0], fc.shoreFacing);
+  $('#flag').hidden = !f || !fc.marine?.length;
+  if (!f) return;
+  $('#flag').className = `flag f${f.level}`;
+  $('#flag').innerHTML = `<i></i><div><b>Drapeau estimé : ${f.color}</b> · ${f.label}${f.why.length ? ` (${esc(f.why.join(', '))})` : ''}
+    <small>Estimation d'après la mer et le vent, pas le drapeau officiel des sauveteurs.</small></div>`;
+}
+
 function renderSea(marine) {
   const m = marine?.find((x) => x.wave != null || x.sst != null);
   $('#sea-card').hidden = !m;
@@ -334,7 +356,7 @@ function renderHistory(fc) {
     + lineChart(hist, 't', '°C') + lineChart(hist.map((p) => ({ ...p, obs: { ...p.obs, w: kmh(p.obs.w) }, fc: p.fc && { ...p.fc, w: kmh(p.fc.w) } })), 'w', 'Vent km/h');
   const st = fc.scores?.stations || [];
   $('#history-src').textContent = st.length
-    ? `Mesures : stations Météo-France ${st.map((s) => `${s.name.toLowerCase().replace(/(^|[\s-])\S/g, (c) => c.toUpperCase())} (${s.km} km)`).join(', ')}, complétées par l'aéroport ${fc.scores.station}.`
+    ? `Mesures : stations ${fc.scores.network || 'Météo-France'} ${st.map((s) => `${s.name.toLowerCase().replace(/(^|[\s-])\S/g, (c) => c.toUpperCase())} (${s.km} km)`).join(', ')}, complétées par l'aéroport ${fc.scores.station}.`
     : `Mesures : aéroport ${fc.scores?.station ?? ''}.`;
 }
 
@@ -432,6 +454,15 @@ function setupSearch() {
   $('#place-btn').onclick = () => { dlg.showModal(); input.focus(); };
   $('#home-btn').onclick = () => { store.set('place', null); dlg.close(); load(); };
   $('#gps-btn').onclick = () => { store.set('place', { gps: true }); dlg.close(); load(); };
+  trackedPlaces().then((places) => {
+    $('#tracked').innerHTML = places.map((p, i) => `<li><button type="button" data-i="${i}">⭐ ${esc(p.place)}<small>prévision complète</small></button></li>`).join('');
+    $('#tracked').querySelectorAll('button').forEach((b) => (b.onclick = () => {
+      const p = places[+b.dataset.i];
+      store.set('place', p.path === 'data/' ? null : { tracked: p.path });
+      dlg.close();
+      load();
+    }));
+  });
   input.oninput = () => {
     clearTimeout(timer);
     timer = setTimeout(async () => {

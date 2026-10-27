@@ -87,3 +87,37 @@ test('prévision recalée sur l\'heure actuelle : plus de nuit à 8 h', async ()
   assert.equal(f.hours[0].isDay, true);
   assert.equal(f.activities[0].scores[0], 5);
 });
+
+test('drapeau estimé : vert par mer calme, jaune ou rouge par vagues et vent de terre', async () => {
+  const { beachFlag } = await import('../web/js/activities.js');
+  assert.equal(beachFlag(H({ wind: 5, gust: 8 }), { wave: 0.3 }, 150).color, 'vert');
+  assert.equal(beachFlag(H({ wind: 5, gust: 8 }), { wave: 1 }, 150).color, 'jaune');
+  assert.equal(beachFlag(H({ wind: 18, gust: 26, dir: 330 }), { wave: 0.3 }, 150).color, 'rouge');
+  assert.equal(beachFlag(H({ wind: 5, gust: 8, code: 95 }), { wave: 0.3 }, 150).color, 'rouge');
+});
+
+test('vigilance espagnole : zone par son nom', async () => {
+  const { parseMeteoAlarm } = await import('../scripts/vigilance.mjs');
+  const json = { warnings: [{ alert: { info: [
+    { language: 'es-ES', event: 'Aviso amarillo por costeros', headline: 'Aviso amarillo', onset: '2026-10-27T06:00:00+00:00', expires: '2026-10-28T06:00:00+00:00',
+      parameter: [{ valueName: 'awareness_level', value: '2; yellow; Moderate' }, { valueName: 'awareness_type', value: '7; coastalevent' }],
+      area: [{ areaDesc: 'Litoral sur de Tarragona' }] },
+  ] } }] };
+  const list = parseMeteoAlarm(json, { dept: '', areaName: 'Litoral sur de Tarragona', lang: 'es', timeZone: 'Europe/Madrid', now: new Date('2026-10-27T08:00:00Z') });
+  assert.equal(list.length, 1);
+  assert.equal(list[0].type, 'Vagues-submersion');
+});
+
+test('Meteocat : mesures regroupées par heure locale', async () => {
+  const { hourlyObs } = await import('../scripts/meteocat.mjs');
+  const rows = [
+    { codi_estacio: 'A', codi_variable: '32', data_lectura: '2026-10-27T06:00:00.000', valor_lectura: '15.2' },
+    { codi_estacio: 'A', codi_variable: '30', data_lectura: '2026-10-27T06:00:00.000', valor_lectura: '5' },
+    { codi_estacio: 'A', codi_variable: '35', data_lectura: '2026-10-27T05:30:00.000', valor_lectura: '0.4' },
+    { codi_estacio: 'A', codi_variable: '35', data_lectura: '2026-10-27T06:00:00.000', valor_lectura: '0.2' },
+  ];
+  const obs = hourlyObs(rows, [{ id: 'A', km: 3 }], 'Europe/Madrid');
+  assert.equal(obs['2026-10-27T07:00'].t, 15.2);
+  assert.equal(obs['2026-10-27T07:00'].w, 9.7);
+  assert.equal(obs['2026-10-27T07:00'].p, 0.6);
+});

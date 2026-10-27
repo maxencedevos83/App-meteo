@@ -108,3 +108,24 @@ export function buildActivities(hours, marine, shoreFacing = 180) {
     return { ...a, scores, windows };
   });
 }
+
+// Drapeau de baignade estimé (vert / jaune / rouge) d'après la mer, le vent et les orages.
+// Ce n'est pas le drapeau officiel, hissé par les sauveteurs pendant la saison surveillée.
+export function beachFlag(h, sea, shoreFacing = 180) {
+  if (!h) return null;
+  const wave = sea?.wave ?? null;
+  const wind = h.wind ?? 0, gust = h.gust ?? wind;
+  const offshore = isNum(h.dir) && shoreAngle(h.dir, shoreFacing) > 120;
+  const why = [];
+  let level = 0;
+  const up = (l, reason) => { if (l >= level) { if (l > level) why.length = 0; level = l; why.push(reason); } };
+  if (h.code >= 95) up(2, 'orages');
+  if (wave != null && wave >= 1.5) up(2, `vagues ${wave.toFixed(1)} m`);
+  else if (wave != null && wave >= 0.8) up(1, `vagues ${wave.toFixed(1)} m`);
+  if (gust >= 30) up(2, 'rafales fortes');
+  else if (gust >= 22 || wind >= 15) up(1, 'vent soutenu');
+  if (offshore && wind >= 15) up(2, 'vent de terre fort');
+  else if (offshore && wind >= 8) up(1, 'vent de terre');
+  const [color, label] = [['vert', 'Baignade sans danger particulier'], ['jaune', 'Baignade dangereuse mais surveillée'], ['rouge', 'Baignade interdite']][level];
+  return { level, color, label, why };
+}

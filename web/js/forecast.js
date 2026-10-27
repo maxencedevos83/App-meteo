@@ -66,6 +66,7 @@ export function buildForecast({ config, sources, ensemblePop = {}, nowcast = nul
     latitude: config.latitude,
     longitude: config.longitude,
     timezone: config.timezone,
+    shoreFacing: config.shoreFacing ?? 180,
     now: nowKey,
     rain: rainNextHour(nowcast?.minutely, nowKey),
     hours: hours.map((h) => ({

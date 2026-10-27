@@ -38,6 +38,8 @@ L'onglet « Sources et fiabilité » de l'appli montre le poids réel de chaque 
 ## Alertes, sorties et mer
 
 - **Alertes** (bandeau de l'appli, et notifications du widget Android, réglables dans l'appli du widget) : vigilance Météo-France du Var (flux public MeteoAlarm), pluie dans l'heure, orage, coup de vent (rafales ≥ 55 km/h sur 12 h, réglable dans l'appli du widget ou dans `config.json` → `alerts.gustKn` en nœuds), bons créneaux de sortie.
+- **Lieux suivis** : en plus du lieu principal, `config.json` → `others` (Cambrils : Windguru #42069, stations Meteocat, aéroport de Reus LERS, vigilance AEMET via MeteoAlarm). Chaque lieu a sa prévision complète dans `data/<id>/` ; le site et le widget y basculent tout seuls à moins de 15 km.
+- **Drapeau de baignade estimé** : vert, jaune ou rouge d'après les vagues, le vent (de terre) et les orages. Ce n'est pas le drapeau officiel.
 - **Soleil et lune** : lever, coucher et phase, calculés pour le lieu (`web/js/astro.js`, `Astro.kt`).
 - **Sorties** : score heure par heure sur 5 jours et meilleurs créneaux pour une sortie bateau, la baignade et la balade. Le score tient compte du vent, des rafales, de l'orientation de la plage (`shoreFacing`, 150° pour Le Lavandou : un vent de terre fort est pénalisé pour le bateau), des vagues, de la température de l'eau, de la pluie et de la nuit. Les seuils sont dans `web/js/activities.js`.
 - **Mer** : vagues, houle (hauteur, période, direction) et température de l'eau sur 6 jours.

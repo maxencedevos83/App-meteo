@@ -34,28 +34,48 @@ object MeteoData {
      */
     fun refresh(context: Context): JSONObject? {
         val here = if (Position.follow(context)) Position.current(context) else null
-        val home = cached(context)?.takeIf { !it.optBoolean("local") } ?: prefs(context).getString("home", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
-        val homeLat = home?.optDouble("lat", 43.1375) ?: 43.1375
-        val homeLon = home?.optDouble("lon", 6.3683) ?: 6.3683
         if (Position.follow(context)) Log.i("Meteo", if (here == null) "Position inconnue : lieu principal" else "Position : ${here.name}")
-        if (here != null && LocalForecast.distanceKm(here.lat, here.lon, homeLat, homeLon) > HOME_RADIUS_KM) {
-            return try {
-                val json = LocalForecast.build(here.lat, here.lon, here.name)
-                Log.i("Meteo", "Prévision locale : ${here.name} ${json.optString("temp")}° ${json.optString("cond")}")
-                prefs(context).edit().putString("json", json.toString()).remove("error").apply()
-                json
-            } catch (e: Exception) {
-                Log.e("Meteo", "Prévision locale impossible", e)
-                prefs(context).edit().putString("error", e.message ?: e.javaClass.simpleName).apply()
-                cached(context)
-            }
+        if (here == null) return refreshHome(context, "data/")
+        // Près d'un lieu suivi par l'appli (Le Lavandou, Cambrils…) : sa prévision complète publiée.
+        val near = places(context).minByOrNull { LocalForecast.distanceKm(here.lat, here.lon, it.lat, it.lon) }
+            ?.takeIf { LocalForecast.distanceKm(here.lat, here.lon, it.lat, it.lon) <= HOME_RADIUS_KM }
+        if (near != null) {
+            Log.i("Meteo", "Lieu suivi : ${near.name}")
+            return refreshHome(context, near.path)
         }
-        return refreshHome(context)
+        return try {
+            val json = LocalForecast.build(here.lat, here.lon, here.name)
+            Log.i("Meteo", "Prévision locale : ${here.name} ${json.optString("temp")}° ${json.optString("cond")}")
+            prefs(context).edit().putString("json", json.toString()).remove("error").apply()
+            json
+        } catch (e: Exception) {
+            Log.e("Meteo", "Prévision locale impossible", e)
+            prefs(context).edit().putString("error", e.message ?: e.javaClass.simpleName).apply()
+            cached(context)
+        }
     }
 
-    /** Télécharge la prévision publiée du lieu principal ; en cas d'échec, renvoie la dernière connue. */
-    private fun refreshHome(context: Context): JSONObject? {
-        val url = siteUrl(context) + "data/widget.json?t=" + System.currentTimeMillis()
+    class Tracked(val name: String, val lat: Double, val lon: Double, val path: String)
+
+    /** Lieux suivis par l'appli (data/places.json), gardés en cache ; à défaut, Le Lavandou. */
+    private fun places(context: Context): List<Tracked> {
+        val body = runCatching {
+            val conn = (URL(siteUrl(context) + "data/places.json?t=" + System.currentTimeMillis()).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 10000; readTimeout = 10000
+            }
+            conn.inputStream.bufferedReader().use { it.readText() }.also { conn.disconnect() }
+        }.getOrNull()
+        if (body != null) prefs(context).edit().putString("places", body).apply()
+        val arr = runCatching { org.json.JSONArray(body ?: prefs(context).getString("places", null)) }.getOrNull()
+            ?: return listOf(Tracked("Le Lavandou", 43.1375, 6.3683, "data/"))
+        return (0 until arr.length()).map { arr.getJSONObject(it) }.map {
+            Tracked(it.optString("place"), it.optDouble("latitude"), it.optDouble("longitude"), it.optString("path", "data/"))
+        }
+    }
+
+    /** Télécharge la prévision publiée d'un lieu suivi ; en cas d'échec, renvoie la dernière connue. */
+    private fun refreshHome(context: Context, path: String): JSONObject? {
+        val url = siteUrl(context) + path + "widget.json?t=" + System.currentTimeMillis()
         return try {
             val conn = (URL(url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 15000
@@ -65,7 +85,7 @@ object MeteoData {
             val body = conn.inputStream.bufferedReader().use { it.readText() }
             conn.disconnect()
             val json = JSONObject(body)
-            prefs(context).edit().putString("json", body).putString("home", body).remove("error").apply()
+            prefs(context).edit().putString("json", body).remove("error").apply()
             json
         } catch (e: Exception) {
             prefs(context).edit().putString("error", e.message ?: e.javaClass.simpleName).apply()
