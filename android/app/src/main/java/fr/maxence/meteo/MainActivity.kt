@@ -274,6 +274,11 @@ class MainActivity : Activity() {
             preview.removeAllViews()
             preview.addView(views.apply(this, preview))
         }.onFailure { Log.e("Meteo", "Aperçu du widget impossible", it) }
+        // Vérifie aussi les deux autres tailles : un élément refusé par l'écran d'accueil y afficherait une erreur.
+        for ((size, w, h) in listOf(Triple(MeteoWidget.Size.SMALL, 180, 90), Triple(MeteoWidget.Size.LARGE, 360, 420))) {
+            runCatching { MeteoWidget.build(this, MeteoData.cached(this), size, w, h).apply(this, FrameLayout(this)) }
+                .onFailure { Log.e("Meteo", "Widget $size impossible à afficher", it) }
+        }
     }
 
     private fun refresh() {
