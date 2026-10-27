@@ -44,7 +44,7 @@ jobs:
       - name: Calculer la prévision combinée
         run: |
           node scripts/update.mjs
-          cat out/data/widget.json
+          head -c 1500 out/data/widget.json
 
       - name: Sauvegarder l'état de vérification
         if: github.event_name != 'pull_request'
