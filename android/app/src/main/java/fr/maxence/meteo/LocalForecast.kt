@@ -143,6 +143,7 @@ object LocalForecast {
                 val daytime = list.filter { it.time.substring(11, 13).toInt() in 7..20 }.ifEmpty { list }
                 put(JSONObject()
                     .put("day", if (i == 0) "Auj." else if (i == 1) "Dem." else dayName(date))
+                    .put("date", date)
                     .put("min", list.mapNotNull { it.temp }.minOrNull()?.roundToInt())
                     .put("max", list.mapNotNull { it.temp }.maxOrNull()?.roundToInt())
                     .put("code", daytime.maxOf { severity(it.code) * 100 + it.code } % 100)
@@ -153,8 +154,9 @@ object LocalForecast {
         })
 
         out.put("chart", JSONArray().apply {
-            for (h in next.take(24)) {
-                put(JSONObject().put("t", h.time).put("h", h.time.substring(11, 13).toInt()).put("code", h.code)
+            for (h in next.take(48)) {
+                put(JSONObject().put("t", h.time).put("h", h.time.substring(11, 13).toInt()).put("code", h.code).put("isDay", h.isDay)
+                    .put("feels", h.feels?.let { (it * 10).roundToInt() / 10.0 })
                     .put("temp", h.temp?.let { (it * 10).roundToInt() / 10.0 }).put("wind", h.wind?.roundToInt())
                     .put("gust", h.gust?.roundToInt()).put("dir", h.dir?.roundToInt()).put("pop", h.pop)
                     .put("precip", (h.precip * 10).roundToInt() / 10.0))
@@ -189,7 +191,7 @@ object LocalForecast {
     }
 
     private val DIRS = arrayOf("N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO")
-    private fun dirLabel(deg: Double?) = if (deg == null) "" else DIRS[((deg / 22.5).roundToInt()) % 16]
+    fun dirLabel(deg: Double?) = if (deg == null) "" else DIRS[((deg / 22.5).roundToInt()) % 16]
 
     fun codeLabel(code: Int, isDay: Boolean): String = when (code) {
         0 -> if (isDay) "Ensoleillé" else "Ciel clair"

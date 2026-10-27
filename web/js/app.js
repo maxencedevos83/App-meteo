@@ -1,6 +1,7 @@
 import { codeEmoji, codeLabel, dirLabel, kmh, KMH } from './ensemble.js';
 import { fetchAllOpenMeteo, fetchEnsemblePop, fetchNowcast, fetchMarine, geocode, reverseGeocode, distanceKm } from './sources.js';
-import { buildForecast } from './forecast.js';
+import { buildForecast, freshen } from './forecast.js';
+import { skyDay } from './astro.js';
 import { buildAlerts, dayWord } from './alerts.js';
 import { startScene, skyKind } from './scene.js';
 
@@ -79,6 +80,8 @@ async function load() {
         fc = await loadPlace({ name: cfg.place, ...cfg });
       }
     }
+    // Recalée sur l'heure actuelle si la dernière mise à jour du serveur date un peu.
+    fc = freshen(fc);
     current = fc;
     render(fc);
   } catch (e) {
@@ -103,7 +106,6 @@ function render(fc) {
   $('#updated').textContent = age < 1 ? 'à l\'instant' : age < 60 ? `il y a ${age} min` : `il y a ${Math.round(age / 60)} h`;
   renderAlerts(fc.alerts || []);
   renderHero(fc);
-  renderChart(fc.hours.slice(0, 48));
   renderHourly(fc.hours.slice(0, 48));
   renderWind(fc.hours.slice(0, 30));
   renderSessions(fc);
@@ -140,43 +142,19 @@ function renderHero(fc) {
       <div class="stat"><small>Vent</small><b>${arrow(h.dir)} ${r0(kmh(h.wind))} km/h</b><small>${dirLabel(h.dir)} · raf. ${r0(kmh(h.gust))}</small></div>
       <div class="stat"><small>Pluie</small><b>${h.pop ?? 0} %</b><small>${h.precip ?? 0} mm/h</small></div>
       <div class="stat"><small>Fiabilité</small><b class="conf"><i style="background:${confColor(h.confidence)}"></i>${h.confidence} %</b><small>${h.n} modèles</small></div>
-    </div>`;
+    </div>
+    ${skyLine(skyDay(fc.now.slice(0, 10), fc.latitude, fc.longitude, fc.timezone))}`;
   // Ciel animé selon le temps qu'il fait : soleil, nuages, pluie, neige, éclairs, vent.
   startScene($('#hero'), { code: h.code, isDay: h.isDay, wind: h.wind, gust: h.gust, anchor: $('#hero .hero-icon') });
 }
 
-function renderChart(hours) {
-  if (!hours.length) return;
-  const W = Math.max(280, $('#chart').clientWidth || 600), H = 160, padL = 26, padR = 8, padT = 12, padB = 20;
-  const temps = hours.flatMap((h) => [h.temp - (h.tempSpread || 0), h.temp + (h.tempSpread || 0)]).filter((v) => !Number.isNaN(v));
-  const lo = Math.floor(Math.min(...temps) - 1), hi = Math.ceil(Math.max(...temps) + 1);
-  const x = (i) => padL + (i / (hours.length - 1)) * (W - padL - padR);
-  const y = (t) => padT + (1 - (t - lo) / (hi - lo || 1)) * (H - padT - padB);
-  const maxP = Math.max(2, ...hours.map((h) => h.precip || 0));
-  const bw = (W - padL - padR) / hours.length;
-  const bars = hours.map((h, i) => {
-    const bh = ((h.precip || 0) / maxP) * (H - padT - padB) * 0.6;
-    const op = 0.25 + 0.75 * ((h.pop ?? 0) / 100);
-    return bh > 0.5 ? `<rect x="${x(i) - bw / 2 + 1}" y="${H - padB - bh}" width="${bw - 2}" height="${bh}" fill="var(--rain)" opacity="${op.toFixed(2)}"/>` : '';
-  }).join('');
-  const up = hours.map((h, i) => `${x(i)},${y(h.temp + (h.tempSpread || 0))}`);
-  const down = hours.map((h, i) => `${x(i)},${y(h.temp - (h.tempSpread || 0))}`).reverse();
-  const line = hours.map((h, i) => `${i ? 'L' : 'M'}${x(i)},${y(h.temp)}`).join('');
-  const grid = [];
-  for (let t = Math.ceil(lo / 2) * 2; t <= hi; t += Math.max(2, Math.round((hi - lo) / 4 / 2) * 2)) {
-    grid.push(`<line x1="${padL}" x2="${W - padR}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)"/><text x="${padL - 4}" y="${y(t) + 3}" text-anchor="end">${t}°</text>`);
-  }
-  const labels = hours.map((h, i) => {
-    const hr = +h.time.slice(11, 13);
-    if (hr === 0) return `<line x1="${x(i)}" x2="${x(i)}" y1="${padT}" y2="${H - padB}" stroke="var(--line)" stroke-dasharray="3 3"/><text x="${x(i) + 3}" y="${H - 6}">${FR_DAYS[new Date(h.time.slice(0, 10) + 'T12:00Z').getUTCDay()]}</text>`;
-    return hr % 6 === 0 ? `<text x="${x(i)}" y="${H - 6}" text-anchor="middle">${hr}h</text>` : '';
-  }).join('');
-  $('#chart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Température et pluie sur 48 heures">
-    ${grid.join('')}${bars}
-    <polygon points="${[...up, ...down].join(' ')}" fill="var(--warm)" opacity="0.15"/>
-    <path d="${line}" fill="none" stroke="var(--warm)" stroke-width="2.2"/>
-    ${labels}
-  </svg>`;
+const hh = (t) => (t ? t.replace(/^0/, '').replace(':', 'h') : '–');
+
+function skyLine(k) {
+  return `<div class="hero-sky">
+    <span>☀️ Lever <b>${hh(k.sunrise)}</b> · coucher <b>${hh(k.sunset)}</b></span>
+    <span>${k.emoji} Lune : lever <b>${hh(k.moonrise)}</b> · coucher <b>${hh(k.moonset)}</b> · ${k.name.toLowerCase()} (${k.moonLit} %)</span>
+  </div>`;
 }
 
 function renderHourly(hours) {
@@ -228,6 +206,7 @@ function renderDays(days) {
         <span class="${d.pop >= 30 ? 'wet' : ''}">💧 ${d.pop} %${d.precip >= 0.5 ? ` · ${d.precip} mm` : ''}</span>
         <span>${arrow(d.dir)} ${r0(kmh(d.wind))} km/h (${r0(kmh(d.gust))})</span>
         <span class="conf"><i style="background:${confColor(d.confidence)}"></i>${d.confidence} %</span>
+        ${d.sunrise ? `<span class="sky">☀️ ${hh(d.sunrise)}–${hh(d.sunset)} · ${d.emoji}</span>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -406,7 +385,21 @@ const radar = {
       $('#radar-time').textContent = 'radar indisponible';
     }
   },
+  // Onglet vent : carte animée Windy (modèle ECMWF), chargée seulement à la demande.
+  tab(kind) {
+    const wind = kind === 'wind';
+    $('#tab-rain').classList.toggle('on', !wind); $('#tab-rain').setAttribute('aria-selected', String(!wind));
+    $('#tab-wind').classList.toggle('on', wind); $('#tab-wind').setAttribute('aria-selected', String(wind));
+    $('#radar').hidden = wind; $('#radar-controls').hidden = wind; $('#wind-map').hidden = !wind;
+    $('#radar-time').textContent = wind ? 'vent en km/h (Windy)' : this.timeLabel || '';
+    if (wind && !$('#wind-map iframe')) {
+      const lat = this.lat ?? 43.14, lon = this.lon ?? 6.37;
+      $('#wind-map').innerHTML = `<iframe title="Carte du vent" loading="lazy" src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=km/h&zoom=8&overlay=wind&product=ecmwf&level=surface&lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&marker=true"></iframe>`;
+    }
+    if (!wind) this.map?.invalidateSize();
+  },
   center(lat, lon) {
+    if (this.lat !== lat || this.lon !== lon) { this.lat = lat; this.lon = lon; if ($('#wind-map iframe')) $('#wind-map').innerHTML = ''; if (!$('#wind-map').hidden) this.tab('wind'); }
     if (!this.map) return;
     this.map.setView([lat, lon], this.map.getZoom());
     this.marker.setLatLng([lat, lon]);
@@ -419,7 +412,8 @@ const radar = {
     $('#radar-slider').value = String(i);
     const f = this.frames[i];
     const t = new Date(f.time * 1000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-    $('#radar-time').textContent = `${t}${f.future ? ' (prévision)' : ''}`;
+    this.timeLabel = `${t}${f.future ? ' (prévision)' : ''}`;
+    if ($('#wind-map').hidden) $('#radar-time').textContent = this.timeLabel;
   },
   toggle() {
     if (this.timer) { clearInterval(this.timer); this.timer = null; $('#radar-play').textContent = '▶ Animer'; return; }
@@ -454,6 +448,8 @@ function setupSearch() {
 }
 
 $('#refresh').onclick = load;
+$('#tab-rain').onclick = () => radar.tab('rain');
+$('#tab-wind').onclick = () => radar.tab('wind');
 setupSearch();
 radar.init();
 load();

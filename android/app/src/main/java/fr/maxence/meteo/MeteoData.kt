@@ -90,6 +90,67 @@ object MeteoData {
         null
     }
 
+    /**
+     * Prévision recalée sur l'heure actuelle : la mise à jour publiée peut dater de quelques heures
+     * (GitHub ne la lance pas toujours toutes les 30 min), et afficherait alors encore la nuit au matin.
+     * Les valeurs de l'heure en cours sont reprises de la courbe horaire, le jour et la nuit recalculés ici.
+     */
+    fun fresh(d: JSONObject, now: Long = System.currentTimeMillis()): JSONObject {
+        val out = JSONObject(d.toString())
+        val lat = out.optDouble("lat", 43.1375)
+        val lon = out.optDouble("lon", 6.3683)
+        val isDayNow = Astro.isDay(now, lat, lon)
+        out.put("isDay", isDayNow)
+        val fmt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:00", java.util.Locale.ROOT)
+        val hourKey = fmt.format(java.util.Date(now))
+        val chart = out.optJSONArray("chart")
+        val idx = if (chart == null) -1 else (0 until chart.length()).firstOrNull { chart.getJSONObject(it).optString("t") >= hourKey } ?: -1
+        if (chart != null && idx > 0) {
+            val next = org.json.JSONArray()
+            for (i in idx until chart.length()) next.put(chart.getJSONObject(i))
+            out.put("chart", next)
+            val cur = next.getJSONObject(0)
+            val code = cur.optInt("code", out.optInt("code", 3))
+            out.put("code", code)
+            out.put("cond", LocalForecast.codeLabel(code, isDayNow))
+            for (k in listOf("temp", "wind", "gust", "pop")) if (cur.has(k) && !cur.isNull(k)) out.put(k, cur.get(k))
+            if (cur.has("feels") && !cur.isNull("feels")) out.put("feels", cur.get("feels"))
+            if (cur.has("dir") && !cur.isNull("dir")) {
+                out.put("dirDeg", cur.getDouble("dir"))
+                out.put("dir", LocalForecast.dirLabel(cur.getDouble("dir")))
+            }
+            // La pluie « dans l'heure » publiée n'est plus d'actualité.
+            out.put("rain", "")
+            val hours = org.json.JSONArray()
+            var i = 1
+            while (i < next.length() && hours.length() < 6) {
+                val h = next.getJSONObject(i)
+                val t = h.optString("t")
+                val ms = runCatching { fmt.parse(t)!!.time }.getOrNull() ?: now
+                hours.put(JSONObject().put("t", "${t.substring(11, 13).toInt()}h").put("temp", h.opt("temp")).put("code", h.optInt("code", 3))
+                    .put("isDay", Astro.isDay(ms + 1_800_000, lat, lon)).put("pop", h.opt("pop")).put("wind", h.opt("wind"))
+                    .put("gust", h.opt("gust")).put("dirDeg", h.opt("dir")))
+                i += 2
+            }
+            out.put("h", hours)
+        }
+        // Jours passés retirés.
+        val days = out.optJSONArray("d")
+        if (days != null && days.length() > 0 && days.getJSONObject(0).has("date")) {
+            val today = hourKey.take(10)
+            val kept = org.json.JSONArray()
+            for (j in 0 until days.length()) days.getJSONObject(j).let { if (it.optString("date") >= today) kept.put(it) }
+            if (kept.length() > 0) {
+                if (kept.getJSONObject(0).optString("date") == today && kept.length() < days.length()) {
+                    kept.getJSONObject(0).put("day", "Auj.")
+                    if (kept.length() > 1) kept.getJSONObject(1).put("day", "Dem.")
+                }
+                out.put("d", kept)
+            }
+        }
+        return out
+    }
+
     /** Le vent est publié en nœuds (unité des modèles) et affiché en km/h. */
     fun kmh(kn: Double?): String = kn?.let { Math.round(it * 1.852).toString() } ?: "–"
 

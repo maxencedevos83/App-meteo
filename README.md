@@ -38,13 +38,14 @@ L'onglet « Sources et fiabilité » de l'appli montre le poids réel de chaque 
 ## Alertes, sorties et mer
 
 - **Alertes** (bandeau de l'appli, et notifications du widget Android, réglables dans l'appli du widget) : vigilance Météo-France du Var (flux public MeteoAlarm), pluie dans l'heure, orage, coup de vent (rafales ≥ 55 km/h sur 12 h, réglable dans l'appli du widget ou dans `config.json` → `alerts.gustKn` en nœuds), bons créneaux de sortie.
-- **Sorties** : score heure par heure sur 5 jours et meilleurs créneaux pour kite/wing, voile, paddle/kayak, baignade et balade. Le score tient compte du vent, des rafales, de l'orientation de la plage (`shoreFacing`, 150° pour Le Lavandou : un vent de terre est pénalisé pour le kite et le paddle), des vagues, de la température de l'eau, de la pluie et de la nuit. Les seuils sont dans `web/js/activities.js`.
+- **Soleil et lune** : lever, coucher et phase, calculés pour le lieu (`web/js/astro.js`, `Astro.kt`).
+- **Sorties** : score heure par heure sur 5 jours et meilleurs créneaux pour une sortie bateau, la baignade et la balade. Le score tient compte du vent, des rafales, de l'orientation de la plage (`shoreFacing`, 150° pour Le Lavandou : un vent de terre fort est pénalisé pour le bateau), des vagues, de la température de l'eau, de la pluie et de la nuit. Les seuils sont dans `web/js/activities.js`.
 - **Mer** : vagues, houle (hauteur, période, direction) et température de l'eau sur 6 jours.
 - **Vent par modèle** : tableau façon Windguru qui compare les modèles toutes les 3 h.
 
 ## Widget Android
 
-Le widget s'adapte à sa taille : **petit** (température, vent, pluie), **moyen** (prochains jours, ou prochaines heures au choix, et alerte principale), **grand** (en plus : graphe vent/rafales/pluie/température sur 24 h, 5 jours et prochains créneaux de sortie). Redimensionne-le par appui long.
+Le widget s'adapte à sa taille : **petit** (température, vent, pluie), **moyen** (prochains jours, ou prochaines heures au choix, et alerte principale), **grand** (en plus : prochaines heures, 5 jours et prochains créneaux de sortie). Les moyen et grand affichent le lever et le coucher du soleil et de la lune, calculés sur le téléphone. Le widget se recale sur l'heure actuelle même si la dernière prévision publiée date de quelques heures. Redimensionne-le par appui long.
 
 - **Ma position** : le widget suit la ville où tu te trouves (localisation approximative, sans GPS fin). Autour du Lavandou (15 km), il garde la prévision complète avec Windguru, les stations et la vigilance du Var ; ailleurs, le téléphone calcule la prévision de la ville avec Météo-France, ECMWF et ICON (📍 devant le nom). Pour que le widget suive aussi en arrière-plan, choisis « Toujours autoriser » ; sinon il utilise la position relevée à la dernière ouverture de l'appli. Dans l'appli web : bouton « 📍 Suivre ma position » dans le choix du lieu.
 - **Heure et date** : grande horloge, petite ou masquée. Un appui sur l'heure ouvre l'horloge du téléphone.

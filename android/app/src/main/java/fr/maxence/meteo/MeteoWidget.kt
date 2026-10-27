@@ -70,7 +70,9 @@ class MeteoWidget : AppWidgetProvider() {
             }
         }
 
-        fun build(context: Context, d: JSONObject?, size: Size, widthDp: Int, heightDp: Int): RemoteViews {
+        fun build(context: Context, data: JSONObject?, size: Size, widthDp: Int, heightDp: Int): RemoteViews {
+            // Recalée sur l'heure actuelle (jour/nuit, temps de l'heure en cours).
+            val d = data?.let { runCatching { MeteoData.fresh(it) }.getOrDefault(it) }
             val layout = when (size) {
                 Size.SMALL -> R.layout.widget_small
                 Size.MEDIUM -> R.layout.widget_meteo
@@ -136,6 +138,11 @@ class MeteoWidget : AppWidgetProvider() {
             v.setTextViewText(R.id.cond, d.optString("cond"))
             v.setTextViewText(R.id.minmax, "${int(d, "min")}° / ${int(d, "max")}° · ressenti ${int(d, "feels")}°")
 
+            // Soleil et lune du jour, calculés ici pour le lieu affiché.
+            val sky = Astro.day(System.currentTimeMillis(), d.optDouble("lat", 43.1375), d.optDouble("lon", 6.3683))
+            v.setTextViewText(R.id.sky, "☀ ${Astro.hm(sky.sunrise)} – ${Astro.hm(sky.sunset)}   ${sky.moonEmoji} ${Astro.hm(sky.moonrise)} – ${Astro.hm(sky.moonset)}")
+            v.setViewVisibility(R.id.sky, if (size == Size.MEDIUM && heightDp < 150 + clockDp) View.GONE else View.VISIBLE)
+
             // Alerte la plus importante (vigilance, orage, coup de vent, pluie).
             val alerts = d.optJSONArray("alerts")
             var top: JSONObject? = null
@@ -176,13 +183,11 @@ class MeteoWidget : AppWidgetProvider() {
             // Un widget moyen peu haut n'affiche pas la ligne des prévisions.
             v.setViewVisibility(R.id.hours, when {
                 size == Size.MEDIUM && heightDp < 130 + clockDp -> View.GONE
-                // Le grand widget a déjà sa ligne des jours sous le graphe.
-                size == Size.LARGE && style.daily -> View.GONE
                 else -> View.VISIBLE
             })
             if (size == Size.MEDIUM && style.daily) {
                 // Prévision sur plusieurs jours, à partir de demain quand la journée est presque finie.
-                val hourNow = d.optString("updated").substringBefore('h').toIntOrNull() ?: 0
+                val hourNow = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
                 val start = if (hourNow >= 20 && days != null && days.length() > hourIds.size) 1 else 0
                 hourIds.forEachIndexed { i, ids ->
                     val day = days?.optJSONObject(start + i)
@@ -200,11 +205,7 @@ class MeteoWidget : AppWidgetProvider() {
             }
 
             if (size == Size.LARGE) {
-                // Hauteur du graphe : ce qui reste une fois les autres lignes placées (≈ 250 dp, plus l'horloge).
-                val chartHeightDp = (heightDp - 250 - clockDp + if (style.daily) 60 else 0).coerceIn(50, 180)
-                val bmp = ChartRenderer.render(d.optJSONArray("chart"), ((widthDp - 24) * density).toInt(), (chartHeightDp * density).toInt(), density, style.textColor)
-                if (bmp != null) v.setImageViewBitmap(R.id.chart, bmp)
-
+                // Grand widget : les prochaines heures, puis les jours (sans graphe).
                 val dayIds = listOf(
                     arrayOf(R.id.d0_t, R.id.d0_icon, R.id.d0_temp, R.id.d0_wind),
                     arrayOf(R.id.d1_t, R.id.d1_icon, R.id.d1_temp, R.id.d1_wind),
@@ -224,7 +225,7 @@ class MeteoWidget : AppWidgetProvider() {
                     if (s.optString("id") == "balade") continue
                     parts.add("${s.optString("emoji")} ${s.optString("when")}")
                 }
-                v.setTextViewText(R.id.sessions, if (parts.isEmpty()) "Pas de bon créneau nautique sur 5 jours" else parts.joinToString("   "))
+                v.setTextViewText(R.id.sessions, if (parts.isEmpty()) "Pas de bon créneau de sortie en bateau sur 5 jours" else parts.joinToString("   "))
             }
 
             val stale = MeteoData.lastError(context)?.let { " · hors ligne" } ?: ""

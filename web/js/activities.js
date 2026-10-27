@@ -1,4 +1,4 @@
-// Score des activités nautiques et de plein air, heure par heure, et meilleurs créneaux.
+// Score des sorties (bateau, baignade, balade), heure par heure, et meilleurs créneaux.
 // Module partagé (navigateur et Node). Les seuils sont des réglages de départ raisonnables, modifiables ici.
 import { dirLabel } from './ensemble.js';
 
@@ -21,9 +21,7 @@ export function shoreAngle(windFrom, shoreFacing) {
 }
 
 export const ACTIVITIES = [
-  { id: 'kite', label: 'Kite / wing', emoji: '🪁' },
-  { id: 'voile', label: 'Voile', emoji: '⛵' },
-  { id: 'paddle', label: 'Paddle / kayak', emoji: '🛶' },
+  { id: 'bateau', label: 'Sortie bateau', emoji: '🚤' },
   { id: 'baignade', label: 'Baignade', emoji: '🏊' },
   { id: 'balade', label: 'Balade / vélo', emoji: '🚶' },
 ];
@@ -41,20 +39,13 @@ export function scoreHour(id, h, sea, shoreFacing) {
   let s;
 
   switch (id) {
-    case 'kite': {
-      s = trap(wind, 11, 15, 25, 33) * clamp01((1.9 - gustiness) / 0.6) * (offshore ? 0.15 : angle < 30 ? 0.9 : 1);
+    case 'bateau': {
+      // Mer calme et vent modéré : au-delà de 25 km/h (≈ 14 nœuds) ou 0,8 m de vagues, la sortie devient inconfortable.
+      s = trap(wind, -1, 0, 10, 20) * trap(gust, -1, 0, 16, 27) * (wave != null ? trap(wave, -1, 0, 0.5, 1.2) : 0.8)
+        * (offshore && wind > 10 ? 0.6 : 1);
       if (offshore && wind > 10) notes.push('vent de terre');
-      if (gustiness > 1.5) notes.push('rafaleux');
-      break;
-    }
-    case 'voile': {
-      s = trap(wind, 5, 9, 17, 25) * clamp01((2 - gustiness) / 0.6) * (wave != null ? trap(wave, -1, 0, 1, 1.8) : 1);
-      if (gustiness > 1.5) notes.push('rafaleux');
-      break;
-    }
-    case 'paddle': {
-      s = trap(wind, -1, 0, 6, 11) * (wave != null ? trap(wave, -1, 0, 0.3, 0.7) : 0.8) * (offshore && wind > 5 ? 0.3 : 1);
-      if (offshore && wind > 5) notes.push('vent de terre');
+      if (wave != null && wave > 0.8) notes.push('mer agitée');
+      if (gust > 20) notes.push('rafales');
       break;
     }
     case 'baignade': {
