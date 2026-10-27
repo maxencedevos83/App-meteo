@@ -13,7 +13,9 @@ const KEEP_DAYS = 10;
 const VARS = { 32: 't', 30: 'w', 31: 'd', 50: 'g', 35: 'p' };
 
 async function get(url) {
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  // Délai court : le portail répond parfois très lentement, la mise à jour ne doit pas l'attendre.
+  const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(25000) })
+    .catch((e) => { throw new Error(`Meteocat : ${e.cause?.code || e.cause?.message || e.message}`); });
   if (!res.ok) throw new Error(`Meteocat ${res.status}`);
   return res.json();
 }

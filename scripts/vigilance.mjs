@@ -12,15 +12,17 @@ const frDate = (iso, timeZone) => new Date(iso).toLocaleString('fr-FR', { timeZo
 
 const norm = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 
-// area : nom de la zone tel que publié (« Var », « Litoral sur de Tarragona »…) ; lang : langue du texte retenu.
+// areaName : nom(s) de la zone tels que publiés (« Var », « Litoral norte de Tarragona »…) ; lang : langue du texte retenu.
 export function parseMeteoAlarm(json, { dept = '83', areaName = 'Var', lang = 'fr', timeZone = 'Europe/Paris', now = new Date() } = {}) {
   const codes = new Set(dept ? [`FR${dept.padStart(3, '0')}`, `FR${dept}`] : []);
   const langRe = new RegExp(`^${lang}`, 'i');
+  // Une ou plusieurs zones (en Espagne, la zone terrestre et sa zone côtière « Costa - … »).
+  const areas = new Set([areaName].flat().map(norm));
   const out = new Map();
   for (const w of json?.warnings || []) {
     for (const info of w.alert?.info || []) {
       if (info.language && !langRe.test(info.language)) continue;
-      const inArea = (info.area || []).some((a) => (a.geocode || []).some((g) => codes.has(String(g.value).toUpperCase())) || norm(a.areaDesc) === norm(areaName));
+      const inArea = (info.area || []).some((a) => (a.geocode || []).some((g) => codes.has(String(g.value).toUpperCase())) || areas.has(norm(a.areaDesc)));
       if (!inArea) continue;
       const level = parseInt(param(info, 'awareness_level'), 10);
       if (!(level >= 2)) continue;

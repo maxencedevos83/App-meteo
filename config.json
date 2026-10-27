@@ -40,7 +40,10 @@
       },
       "vigilance": {
         "country": "spain",
-        "area": "Litoral sur de Tarragona",
+        "area": [
+          "Litoral norte de Tarragona",
+          "Costa - Litoral norte de Tarragona"
+        ],
         "lang": "es"
       },
       "shoreFacing": 150

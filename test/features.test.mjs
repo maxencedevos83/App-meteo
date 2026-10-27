@@ -101,9 +101,9 @@ test('vigilance espagnole : zone par son nom', async () => {
   const json = { warnings: [{ alert: { info: [
     { language: 'es-ES', event: 'Aviso amarillo por costeros', headline: 'Aviso amarillo', onset: '2026-10-27T06:00:00+00:00', expires: '2026-10-28T06:00:00+00:00',
       parameter: [{ valueName: 'awareness_level', value: '2; yellow; Moderate' }, { valueName: 'awareness_type', value: '7; coastalevent' }],
-      area: [{ areaDesc: 'Litoral sur de Tarragona' }] },
+      area: [{ areaDesc: 'Costa - Litoral norte de Tarragona' }] },
   ] } }] };
-  const list = parseMeteoAlarm(json, { dept: '', areaName: 'Litoral sur de Tarragona', lang: 'es', timeZone: 'Europe/Madrid', now: new Date('2026-10-27T08:00:00Z') });
+  const list = parseMeteoAlarm(json, { dept: '', areaName: ['Litoral norte de Tarragona', 'Costa - Litoral norte de Tarragona'], lang: 'es', timeZone: 'Europe/Madrid', now: new Date('2026-10-27T08:00:00Z') });
   assert.equal(list.length, 1);
   assert.equal(list[0].type, 'Vagues-submersion');
 });
