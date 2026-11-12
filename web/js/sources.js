@@ -112,3 +112,23 @@ export async function geocode(query, fetchImpl) {
   const json = await getJson(url, fetchImpl);
   return (json.results || []).map((r) => ({ name: r.name, admin: [r.admin1, r.country].filter(Boolean).join(', '), latitude: r.latitude, longitude: r.longitude, timezone: r.timezone }));
 }
+
+/** Données agricoles par jour : ensoleillement (h), évapotranspiration de référence (mm), UV, humidité du sol. */
+export async function fetchAgri(lat, lon, timeZone, fetchImpl) {
+  const url = `https://api.open-meteo.com/v1/forecast?${base(lat, lon, timeZone)}`
+    + '&daily=sunshine_duration,et0_fao_evapotranspiration,uv_index_max,precipitation_hours'
+    + '&hourly=soil_moisture_3_to_9cm,soil_temperature_6cm&forecast_days=10';
+  const json = await getJson(url, fetchImpl);
+  const d = json.daily || {}, h = json.hourly || {};
+  const out = {};
+  (d.time || []).forEach((date, i) => {
+    const idx = (h.time || []).map((t, j) => (t.startsWith(date) ? j : -1)).filter((j) => j >= 0);
+    const mean = (arr) => { const v = idx.map((j) => arr?.[j]).filter((x) => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+    out[date] = {
+      sun: d.sunshine_duration?.[i] == null ? null : Math.round(d.sunshine_duration[i] / 360) / 10,
+      et0: d.et0_fao_evapotranspiration?.[i], uv: d.uv_index_max?.[i], rainHours: d.precipitation_hours?.[i],
+      soil: mean(h.soil_moisture_3_to_9cm), soilTemp: mean(h.soil_temperature_6cm),
+    };
+  });
+  return out;
+}

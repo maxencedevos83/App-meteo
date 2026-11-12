@@ -43,3 +43,12 @@ android {
         jvmTarget = "17"
     }
 }
+
+// L'interface de l'appli (dossier web/ du dépôt) est embarquée dans l'APK : assets/web/.
+val webAssets = layout.buildDirectory.dir("generated/webassets")
+val copyWeb by tasks.registering(Sync::class) {
+    from(rootProject.file("../web")) { exclude("sw.js", "manifest.webmanifest") }
+    into(webAssets.map { it.dir("web") })
+}
+android.sourceSets["main"].assets.srcDir(webAssets)
+tasks.named("preBuild") { dependsOn(copyWeb) }

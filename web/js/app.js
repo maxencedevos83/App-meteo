@@ -1,10 +1,11 @@
 import { codeEmoji, codeLabel, dirLabel, kmh, KMH } from './ensemble.js';
-import { fetchAllOpenMeteo, fetchEnsemblePop, fetchNowcast, fetchMarine, geocode, reverseGeocode, distanceKm } from './sources.js';
+import { fetchAllOpenMeteo, fetchEnsemblePop, fetchNowcast, fetchMarine, fetchAgri, geocode, reverseGeocode, distanceKm } from './sources.js';
 import { buildForecast, freshen } from './forecast.js';
 import { skyDay } from './astro.js';
 import { buildAlerts, dayWord } from './alerts.js';
 import { startScene, skyKind } from './scene.js';
 import { beachFlag } from './activities.js';
+import { dayPeriods, threeHourly, dayText } from './daydetail.js';
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -122,12 +123,14 @@ function render(fc) {
   renderWind(fc.hours.slice(0, 30));
   renderSessions(fc);
   renderModels(fc);
-  renderDays(fc.days);
+  renderDays(fc);
+  renderLinks(fc);
   renderSea(fc.marine);
   renderFlag(fc);
   renderHistory(fc);
   renderSources(fc);
   radar.center(fc.latitude, fc.longitude);
+  window.MeteoApp?.ready?.(fc.place, fc.days.length);
 }
 
 function renderHero(fc) {
@@ -203,14 +206,15 @@ function renderWind(hours) {
   </table>`;
 }
 
-function renderDays(days) {
-  const all = days.filter((d) => d.min != null);
+function renderDays(fc) {
+  const all = fc.days.filter((d) => d.min != null);
   const lo = Math.min(...all.map((d) => d.min)), hi = Math.max(...all.map((d) => d.max));
+  const open = new Set([...document.querySelectorAll('#days details[open]')].map((e) => e.dataset.date));
   $('#days').innerHTML = all.map((d, i) => {
     const date = new Date(d.date + 'T12:00Z');
     const name = i === 0 ? 'Auj.' : i === 1 ? 'Dem.' : FR_DAYS[date.getUTCDay()];
     const left = ((d.min - lo) / (hi - lo || 1)) * 100, width = ((d.max - d.min) / (hi - lo || 1)) * 100;
-    return `<div class="day">
+    return `<details class="day-wrap" data-date="${d.date}"${open.has(d.date) ? ' open' : ''}><summary class="day">
       <div class="name">${name}<small>${date.getUTCDate()}/${date.getUTCMonth() + 1}</small></div>
       <div class="e">${codeEmoji(d.code, true)}</div>
       <div class="range"><span style="left:${left}%;width:${Math.max(width, 3)}%"></span></div>
@@ -220,9 +224,92 @@ function renderDays(days) {
         <span>${arrow(d.dir)} ${r0(kmh(d.wind))} km/h (${r0(kmh(d.gust))})</span>
         <span class="conf"><i style="background:${confColor(d.confidence)}"></i>${d.confidence} %</span>
         ${d.sunrise ? `<span class="sky">☀️ ${hh(d.sunrise)}–${hh(d.sunset)} · ${d.emoji}</span>` : ''}
+        <span class="more">détail ▾</span>
       </div>
-    </div>`;
+    </summary><div class="day-detail">${dayDetail(fc, d.date)}</div></details>`;
   }).join('');
+  agri.load(fc);
+}
+
+// Détail d'un jour : résumé par moment, tableau toutes les 3 h, données agricoles (remplies à part).
+function dayDetail(fc, date) {
+  const periods = dayPeriods(fc.hours, fc.marine, date);
+  const rows = threeHourly(fc.hours, fc.marine, date);
+  if (!rows.length) return '<p class="explain">Pas de détail horaire pour ce jour.</p>';
+  const sea = rows.some((r) => r.wave != null);
+  const cell = (v) => `<td style="background:${windColor(v)};color:#111">${r0(kmh(v))}</td>`;
+  return `<ul class="day-text">${dayText(periods).map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+    <div class="wind-table"><table>
+      <tr><th>Heure</th>${rows.map((r) => `<td>${r.hour}h</td>`).join('')}</tr>
+      <tr><th>Temps</th>${rows.map((r) => `<td class="e">${codeEmoji(r.code, r.isDay)}</td>`).join('')}</tr>
+      <tr><th>Temp.</th>${rows.map((r) => `<td><b>${r0(r.temp)}°</b></td>`).join('')}</tr>
+      <tr><th>Ressenti</th>${rows.map((r) => `<td style="color:var(--muted)">${r0(r.feels)}°</td>`).join('')}</tr>
+      <tr><th>Pluie mm</th>${rows.map((r) => `<td class="${r.precip >= 0.3 ? 'wet' : ''}">${r.precip ? r.precip : '–'}</td>`).join('')}</tr>
+      <tr><th>Risque %</th>${rows.map((r) => `<td class="${r.pop >= 30 ? 'wet' : ''}">${r.pop ?? '–'}</td>`).join('')}</tr>
+      <tr><th>Vent</th>${rows.map((r) => cell(r.wind)).join('')}</tr>
+      <tr><th>Rafales</th>${rows.map((r) => cell(r.gust)).join('')}</tr>
+      <tr><th>Dir.</th>${rows.map((r) => `<td title="${dirLabel(r.dir)}">${arrow(r.dir)}<small>${dirLabel(r.dir)}</small></td>`).join('')}</tr>
+      ${sea ? `<tr><th>Vagues</th>${rows.map((r) => `<td>${r.wave == null ? '–' : r.wave.toFixed(1)}</td>`).join('')}</tr>` : ''}
+      <tr><th>Nuages %</th>${rows.map((r) => `<td>${r.cloud == null ? '–' : r0(r.cloud)}</td>`).join('')}</tr>
+      <tr><th>Humidité %</th>${rows.map((r) => `<td>${r.rh == null ? '–' : r0(r.rh)}</td>`).join('')}</tr>
+      <tr><th>Fiabilité</th>${rows.map((r) => `<td><i class="dot" style="background:${confColor(r.confidence)}"></i>${r.confidence ?? '–'}</td>`).join('')}</tr>
+    </table></div>
+    <div class="agri" data-agri="${date}"></div>`;
+}
+
+// Données agricoles (Open-Meteo) : ensoleillement, évapotranspiration, UV, sol. Chargées une fois par lieu.
+const agri = {
+  key: null, data: null,
+  async load(fc) {
+    const key = `${fc.latitude},${fc.longitude}`;
+    if (this.key !== key) {
+      this.key = key; this.data = null;
+      try { this.data = await fetchAgri(fc.latitude, fc.longitude, fc.timezone); } catch { this.data = {}; }
+      if (this.key !== key) return;
+    }
+    if (!this.data) return;
+    document.querySelectorAll('[data-agri]').forEach((el) => {
+      const a = this.data[el.dataset.agri];
+      if (!a) return;
+      const parts = [
+        a.sun != null && `☀️ ${a.sun} h de soleil`,
+        a.rainHours != null && a.rainHours > 0 && `🌧 ${a.rainHours} h de pluie`,
+        a.et0 != null && `💦 évapotranspiration ${a.et0.toFixed(1)} mm`,
+        a.uv != null && `UV ${Math.round(a.uv)}`,
+        a.soil != null && `🌱 sol ${Math.round(a.soil * 100)} % d'eau`,
+        a.soilTemp != null && `sol ${Math.round(a.soilTemp)}°`,
+      ].filter(Boolean);
+      el.innerHTML = parts.length ? `<small>Agricole</small> ${parts.map((p) => `<span>${p}</span>`).join('')}` : '';
+    });
+  },
+};
+
+// Bulletins officiels et cartes utiles autour du lieu affiché.
+function renderLinks(fc) {
+  const lat = fc.latitude.toFixed(3), lon = fc.longitude.toFixed(3);
+  const spain = fc.timezone === 'Europe/Madrid';
+  const groups = [
+    ['🌊 Mer', [
+      spain
+        ? ['Bulletin maritime AEMET', 'https://www.aemet.es/es/eltiempo/prediccion/maritima']
+        : ['Météo marine Météo-France (bulletins côtiers)', 'https://meteofrance.com/meteo-marine'],
+      !spain && ['Bulletin détaillé de Toulon (Météo Consult)', 'https://marine.meteoconsult.fr/meteo-marine/bulletin-detaille/port-62/previsions-meteo-toulon-aujourdhui'],
+      fc.windguru?.spotId && [`Windguru${fc.windguru.spotName ? ` – ${fc.windguru.spotName}` : ''}`, `https://www.windguru.cz/${fc.windguru.spotId}`],
+      ['Vagues et houle (Windy)', `https://www.windy.com/?waves,${lat},${lon},9`],
+    ]],
+    ['🌧 Radars', [
+      spain ? ['Radar Meteocat (Catalogne)', 'https://www.meteo.cat/observacions/radar'] : ['Pluie en direct (Météo-France)', 'https://meteofrance.com/images-radar'],
+      spain && ['Radar AEMET', 'https://www.aemet.es/es/eltiempo/observacion/radar'],
+      ['Orages et éclairs (Blitzortung)', `https://map.blitzortung.org/#8/${lat}/${lon}`],
+      ['Vent animé (Windy)', `https://www.windy.com/?wind,${lat},${lon},9`],
+    ]],
+    ['🌱 Agricole', [
+      ['Météo agricole (Terre-net, une partie réservée aux abonnés)', 'https://www.terre-net.fr/meteo-agricole'],
+    ]],
+  ];
+  const note = '<p class="explain">Ensoleillement, évapotranspiration, UV et humidité du sol sont aussi dans le détail de chaque jour (10 jours).</p>';
+  $('#links').innerHTML = groups.map(([title, items]) => `<div class="link-group"><h3 class="sub">${title}</h3>
+    ${items.filter(Boolean).map(([label, url]) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(label)} ↗</a>`).join('')}</div>`).join('') + note;
 }
 
 function renderAlerts(alerts) {
@@ -407,21 +494,23 @@ const radar = {
       $('#radar-time').textContent = 'radar indisponible';
     }
   },
-  // Onglet vent : carte animée Windy (modèle ECMWF), chargée seulement à la demande.
+  // Onglets vent et vagues : cartes animées Windy (modèle ECMWF), chargées seulement à la demande.
   tab(kind) {
-    const wind = kind === 'wind';
-    $('#tab-rain').classList.toggle('on', !wind); $('#tab-rain').setAttribute('aria-selected', String(!wind));
-    $('#tab-wind').classList.toggle('on', wind); $('#tab-wind').setAttribute('aria-selected', String(wind));
-    $('#radar').hidden = wind; $('#radar-controls').hidden = wind; $('#wind-map').hidden = !wind;
-    $('#radar-time').textContent = wind ? 'vent en km/h (Windy)' : this.timeLabel || '';
-    if (wind && !$('#wind-map iframe')) {
+    this.kind = kind;
+    const map = kind !== 'rain';
+    for (const k of ['rain', 'wind', 'waves']) { $(`#tab-${k}`).classList.toggle('on', k === kind); $(`#tab-${k}`).setAttribute('aria-selected', String(k === kind)); }
+    $('#radar').hidden = map; $('#radar-controls').hidden = map; $('#wind-map').hidden = !map;
+    $('#radar-time').textContent = kind === 'wind' ? 'vent en km/h (Windy)' : kind === 'waves' ? 'vagues en m (Windy)' : this.timeLabel || '';
+    if (map && $('#wind-map').dataset.kind !== kind) {
       const lat = this.lat ?? 43.14, lon = this.lon ?? 6.37;
-      $('#wind-map').innerHTML = `<iframe title="Carte du vent" loading="lazy" src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=km/h&zoom=8&overlay=wind&product=ecmwf&level=surface&lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&marker=true"></iframe>`;
+      const overlay = kind === 'waves' ? 'waves' : 'wind';
+      $('#wind-map').dataset.kind = kind;
+      $('#wind-map').innerHTML = `<iframe title="Carte ${kind === 'waves' ? 'des vagues' : 'du vent'}" loading="lazy" src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=km/h&zoom=8&overlay=${overlay}&product=ecmwf&level=surface&lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&marker=true"></iframe>`;
     }
-    if (!wind) this.map?.invalidateSize();
+    if (!map) this.map?.invalidateSize();
   },
   center(lat, lon) {
-    if (this.lat !== lat || this.lon !== lon) { this.lat = lat; this.lon = lon; if ($('#wind-map iframe')) $('#wind-map').innerHTML = ''; if (!$('#wind-map').hidden) this.tab('wind'); }
+    if (this.lat !== lat || this.lon !== lon) { this.lat = lat; this.lon = lon; $('#wind-map').innerHTML = ''; delete $('#wind-map').dataset.kind; if (!$('#wind-map').hidden) this.tab(this.kind); }
     if (!this.map) return;
     this.map.setView([lat, lon], this.map.getZoom());
     this.marker.setLatLng([lat, lon]);
@@ -481,9 +570,18 @@ function setupSearch() {
 $('#refresh').onclick = load;
 $('#tab-rain').onclick = () => radar.tab('rain');
 $('#tab-wind').onclick = () => radar.tab('wind');
+$('#tab-waves').onclick = () => radar.tab('waves');
 setupSearch();
 radar.init();
 load();
 setInterval(() => { if (document.visibilityState === 'visible') load(); }, 15 * 60000);
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+// Dans l'appli Android, le téléphone garde lui-même les données hors ligne : pas de service worker,
+// et un bouton ouvre les réglages du widget.
+if (window.MeteoApp) {
+  const b = document.createElement('button');
+  b.className = 'icon-btn'; b.id = 'settings'; b.setAttribute('aria-label', 'Réglages du widget et des alertes'); b.textContent = '⚙️';
+  b.onclick = () => window.MeteoApp.openSettings();
+  $('#refresh').after(b);
+  document.documentElement.classList.add('in-app');
+} else if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

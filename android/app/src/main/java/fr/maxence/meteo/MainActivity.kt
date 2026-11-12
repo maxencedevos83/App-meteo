@@ -175,7 +175,7 @@ class MainActivity : Activity() {
         add(backgroundButton)
 
         section("Prévision")
-        label("Adresse de l'appli")
+        label("Adresse des données de prévision")
         val url = EditText(this).apply {
             setText(MeteoData.siteUrl(this@MainActivity))
             inputType = InputType.TYPE_TEXT_VARIATION_URI
@@ -190,7 +190,7 @@ class MainActivity : Activity() {
         })
         add(Button(this).apply {
             text = "Ouvrir l'appli complète"
-            setOnClickListener { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(MeteoData.siteUrl(this@MainActivity)))) }
+            setOnClickListener { startActivity(Intent(this@MainActivity, AppActivity::class.java)) }
         })
         status = TextView(this).apply { setPadding(0, pad, 0, 0) }
         add(status)
