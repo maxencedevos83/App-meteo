@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Météo fiable</title>
   <meta name="description" content="Prévision combinée de plusieurs modèles (Météo-France, ECMWF, DWD, Windguru…), pondérée par leur justesse locale.">
-  <meta name="theme-color" content="#0f2a44">
+  <meta name="theme-color" content="#17457e">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="preload" href="fonts/outfit.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
@@ -45,34 +46,34 @@
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>48 prochaines heures</h2></div>
+      <div class="card-head"><h2><span class="ic" aria-hidden="true">🕐</span>48 prochaines heures</h2></div>
       <div id="hourly" class="hourly"></div>
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>Vent</h2><span class="hint">km/h · rafales</span></div>
+      <div class="card-head"><h2><span class="ic" aria-hidden="true">💨</span>Vent</h2><span class="hint">km/h · rafales</span></div>
       <div id="wind" class="wind-table"></div>
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>10 jours</h2><span class="hint">touchez un jour pour le détail</span></div>
+      <div class="card-head"><h2><span class="ic" aria-hidden="true">📅</span>10 jours</h2><span class="hint">touchez un jour</span></div>
       <div id="days" class="days"></div>
     </section>
 
     <section class="card" id="sessions-card">
-      <div class="card-head"><h2>Sorties</h2><span class="hint">meilleurs créneaux sur 5 jours</span></div>
+      <div class="card-head"><h2><span class="ic" aria-hidden="true">⛵</span>Sorties</h2><span class="hint">meilleurs créneaux sur 5 jours</span></div>
       <div id="sessions" class="sessions"></div>
     </section>
 
     <section class="card" id="sea-card" hidden>
-      <div class="card-head"><h2>Température de l'eau et mer</h2></div>
+      <div class="card-head"><h2><span class="ic" aria-hidden="true">🌊</span>Température de l'eau et mer</h2></div>
       <div id="flag" class="flag" hidden></div>
       <div id="sea" class="sea"></div>
       <div id="sea-days" class="wind-table sea-days"></div>
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>Radar</h2><span class="hint" id="radar-time"></span></div>
+      <div class="card-head"><h2><span class="ic" aria-hidden="true">📡</span>Radar</h2><span class="hint" id="radar-time"></span></div>
       <div class="tabs" role="tablist">
         <button id="tab-rain" class="chip on" role="tab" aria-selected="true">🌧 Pluie</button>
         <button id="tab-wind" class="chip" role="tab" aria-selected="false">💨 Vent</button>
@@ -87,12 +88,12 @@
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>Bulletins et radars</h2><span class="hint">mer, pluie, agricole</span></div>
+      <div class="card-head"><h2><span class="ic" aria-hidden="true">📰</span>Bulletins et radars</h2><span class="hint">mer, pluie, agricole</span></div>
       <div id="links" class="links"></div>
     </section>
 
     <section class="card" id="history-card" hidden>
-      <div class="card-head"><h2>Prévu vs réel</h2><span class="hint">48 dernières heures</span></div>
+      <div class="card-head"><h2><span class="ic" aria-hidden="true">🎯</span>Prévu vs réel</h2><span class="hint">48 dernières heures</span></div>
       <div id="history-stats" class="hero-stats verif"></div>
       <div id="history" class="chart"></div>
       <div class="legend"><span><i class="ln fc"></i>prévu (3 à 12 h avant)</span><span><i class="ln ob"></i>mesuré</span></div>
@@ -100,7 +101,7 @@
     </section>
 
     <details class="card fold">
-      <summary class="card-head"><h2>Sources et fiabilité</h2><span class="hint">toucher pour afficher</span></summary>
+      <summary class="card-head"><h2><span class="ic" aria-hidden="true">🧪</span>Sources et fiabilité</h2><span class="hint">toucher pour afficher</span></summary>
       <p class="explain" id="explain"></p>
       <div id="sources" class="sources"></div>
       <h3 class="sub">Vent par modèle <small>km/h, toutes les 3 h</small></h3>

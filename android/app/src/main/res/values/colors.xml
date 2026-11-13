@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="launcher_bg">#1D5FA8</color>
+    <!-- Fond de l'appli avant que la page ne peigne le ciel du moment. -->
+    <color name="app_sky">#0F2C52</color>
 </resources>
