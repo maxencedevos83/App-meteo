@@ -41,7 +41,17 @@ export function parseMeteoAlarm(json, { dept = '83', areaName = 'Var', lang = 'f
       });
     }
   }
-  return [...out.values()].sort((a, b) => b.level - a.level);
+  // Même phénomène et même couleur sur plusieurs périodes (ex. aujourd'hui puis demain, ou bulletin mis à jour) :
+  // une seule alerte, du premier début à la dernière fin.
+  const merged = new Map();
+  for (const v of out.values()) {
+    const k = `${v.type}-${v.level}`;
+    const m = merged.get(k);
+    if (!m) { merged.set(k, { ...v }); continue; }
+    if (v.onset && (!m.onset || v.onset < m.onset)) Object.assign(m, { onset: v.onset, onsetLabel: v.onsetLabel });
+    if (v.expires && (!m.expires || Date.parse(v.expires) > Date.parse(m.expires))) Object.assign(m, { expires: v.expires, expiresLabel: v.expiresLabel });
+  }
+  return [...merged.values()].sort((a, b) => b.level - a.level);
 }
 
 export async function fetchVigilance(config, now = new Date()) {

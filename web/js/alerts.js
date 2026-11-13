@@ -47,5 +47,7 @@ export function buildAlerts(fc, { gustKn = 30, vigilance = [], sessionMin = 75 }
     const w = a.windows.find((x) => x.score >= sessionMin && ['aujourd\'hui', 'demain'].includes(dayWord(x.start, now)) && x.end >= now.slice(0, 13) + ':00');
     if (w) alerts.push({ id: `session-${a.id}-${w.start}`, type: 'session', level: 0, title: `${a.emoji} ${a.label} : bon créneau ${dayWord(w.start, now)}`, text: `${hhmm(w.start)} à ${+w.end.slice(11, 13) + 1}h · ${kn2kmh(w.wind)} km/h ${w.dir} (raf. ${kn2kmh(w.gust)})` });
   }
-  return alerts;
+  // Jamais deux fois la même alerte à l'écran (ex. vigilance publiée sur deux périodes).
+  const seen = new Set();
+  return alerts.filter((a) => { const k = `${a.title}|${a.text}`; if (seen.has(k)) return false; seen.add(k); return true; });
 }
