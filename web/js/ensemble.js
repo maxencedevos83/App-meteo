@@ -232,7 +232,7 @@ export function daily(hours) {
     const dir = circularMean(ref.filter((h) => isNum(h.dir)).map((h) => [h.dir, (h.wind || 0) + 0.1]));
     const cloud = ref.reduce((a, h) => a + (h.cloud ?? 0), 0) / ref.length;
     // Le phénomène le plus marquant de la journée l'emporte.
-    const sig = (c) => (c >= 95 ? 6 : c >= 71 && c <= 77 ? 5 : c >= 61 ? 4 : c >= 51 ? 3 : c === 45 ? 2 : 0);
+    const sig = codeSeverity;
     let code = deriveCode({ precip: 0, cloud });
     for (const h of ref) if (sig(h.code) > sig(code)) code = h.code;
     if (precip < 0.5 && sig(code) >= 3 && sig(code) < 6) code = deriveCode({ precip: 0, cloud: Math.max(cloud, 60) });
@@ -259,6 +259,12 @@ export const CODE_LABELS = {
   80: 'Averses', 81: 'Averses', 82: 'Fortes averses',
   95: 'Orages', 96: 'Orages forts', 99: 'Orages de grêle',
 };
+
+/** Gravité d'un code météo : orage > neige > pluie et averses > bruine > brouillard > nuages ou soleil. */
+export function codeSeverity(c) {
+  if (c == null) return -1;
+  return c >= 95 ? 6 : (c >= 71 && c <= 77) || c === 85 || c === 86 ? 5 : c >= 61 ? 4 : c >= 51 ? 3 : c === 45 || c === 48 ? 2 : 0;
+}
 
 export function codeLabel(code, isDay = true) {
   if (!isDay && code === 0) return 'Ciel dégagé';
