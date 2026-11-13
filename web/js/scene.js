@@ -69,7 +69,7 @@ export function startScene(host, { code, isDay, wind = 0, gust = 0, anchor = nul
 
     for (const c of clouds) {
       const x = ((c.x + t * c.v) % 1.4) - 0.2;
-      cloud(ctx, x * W, c.y * H, c.s * Math.min(70, W * 0.16), cloudColor, kind === 'fog' ? 0.4 : kind === 'storm' || kind === 'rain' ? 0.6 : 0.45);
+      cloud(ctx, x * W, c.y * H, c.s * Math.min(70, W * 0.16), cloudColor, kind === 'fog' ? 0.32 : kind === 'storm' || kind === 'rain' ? 0.5 : 0.34);
     }
 
     if (kind === 'fog') {

@@ -176,6 +176,7 @@ class AppActivity : Activity() {
         "json", "webmanifest" -> "application/json"
         "svg" -> "image/svg+xml"
         "png" -> "image/png"
+        "woff2" -> "font/woff2"
         else -> "application/octet-stream"
     }
 
@@ -183,6 +184,22 @@ class AppActivity : Activity() {
         @JavascriptInterface
         fun openSettings() {
             runOnUiThread { startActivity(Intent(this@AppActivity, MainActivity::class.java)) }
+        }
+
+        /** Barres du téléphone (heure, batterie, navigation) aux couleurs du ciel affiché par la page. */
+        @JavascriptInterface
+        fun setBars(top: String?, bottom: String?) {
+            val t = runCatching { android.graphics.Color.parseColor(top) }.getOrNull() ?: return
+            val b = runCatching { android.graphics.Color.parseColor(bottom) }.getOrNull() ?: t
+            runOnUiThread {
+                window.statusBarColor = t
+                window.navigationBarColor = b
+                // Ciel toujours assez sombre : icônes claires.
+                @Suppress("DEPRECATION")
+                window.decorView.systemUiVisibility = window.decorView.systemUiVisibility and
+                    (android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR).inv()
+                web.setBackgroundColor(b)
+            }
         }
 
         /** Appelé par la page une fois la prévision affichée (sert aussi à l'essai sur émulateur). */

@@ -139,48 +139,126 @@ function renderHero(fc) {
   const today = fc.hours.filter((x) => x.time.slice(0, 10) === fc.now.slice(0, 10));
   const span = (today.length < 8 ? fc.hours.slice(0, 24) : today).map((x) => x.temp).filter((t) => t != null);
   const d = { min: Math.min(...span), max: Math.max(...span) };
-  const bars = (fc.rain?.slots || []).map((s) => `<span style="height:${Math.min(22, 2 + (s.precip || 0) * 10)}px" title="${s.time.slice(11)} : ${s.precip} mm"></span>`).join('');
-  const banner = fc.local ? '<div class="banner" style="margin-bottom:12px;color:var(--ink)">Lieu secondaire : modèles Open-Meteo seulement (Windguru et vérification locale sont réservés au lieu principal).</div>' : '';
+  const bars = (fc.rain?.slots || []).map((s) => `<span style="height:${Math.min(22, 3 + (s.precip || 0) * 10)}px" title="${s.time.slice(11)} : ${s.precip} mm"></span>`).join('');
+  const banner = fc.local ? '<div class="banner" style="margin:6px 0 0">Lieu secondaire : modèles Open-Meteo seulement (Windguru et vérification locale sont réservés au lieu principal).</div>' : '';
+  const sky = skyDay(fc.now.slice(0, 10), fc.latitude, fc.longitude, fc.timezone);
   $('#hero').innerHTML = `${banner}
     <div class="hero-main">
-      <div class="hero-icon" aria-label="${codeLabel(h.code, h.isDay)}">${['clear', 'partly'].includes(skyKind(h.code)) ? '' : codeEmoji(h.code, h.isDay)}</div>
       <div>
-        <div class="hero-temp">${r0(h.temp)}°</div>
-      </div>
-      <div style="margin-left:auto;text-align:right">
         <div class="hero-cond">${codeLabel(h.code, h.isDay)}</div>
-        <div class="hero-sub">Ressenti ${r0(h.feels)}°</div>
-        <div class="hero-sub">${r0(d.min)}° / ${r0(d.max)}°</div>
+        <div class="hero-temp">${r0(h.temp)}°</div>
+        <div class="hero-sub"><span>Ressenti <b>${r0(h.feels)}°</b></span><span>↓ <b>${r0(d.min)}°</b> &nbsp;↑ <b>${r0(d.max)}°</b></span></div>
       </div>
+      <div class="hero-icon" aria-label="${codeLabel(h.code, h.isDay)}">${['clear', 'partly'].includes(skyKind(h.code)) ? '' : codeEmoji(h.code, h.isDay)}</div>
     </div>
     ${fc.rain?.text ? `<div class="hero-rain">💧 ${esc(fc.rain.text)}<div class="rain-bars">${bars}</div></div>` : ''}
     <div class="hero-stats">
-      <div class="stat"><small>Vent</small><b>${arrow(h.dir)} ${r0(kmh(h.wind))} km/h</b><small>${dirLabel(h.dir)} · raf. ${r0(kmh(h.gust))}</small></div>
+      <div class="stat"><small>Vent</small><b>${arrow(h.dir)} ${r0(kmh(h.wind))} <small style="display:inline;font-size:12px">km/h</small></b><small>${dirLabel(h.dir)} · raf. ${r0(kmh(h.gust))}</small></div>
       <div class="stat"><small>Pluie</small><b>${h.pop ?? 0} %</b><small>${h.precip ?? 0} mm/h</small></div>
-      <div class="stat"><small>Fiabilité</small><b class="conf"><i style="background:${confColor(h.confidence)}"></i>${h.confidence} %</b><small>${h.n} modèles</small></div>
+      <div class="stat"><small>Fiabilité</small><b class="conf" style="color:${confColor(h.confidence)}"><i style="background:currentColor"></i><span style="color:var(--ink)">${h.confidence} %</span></b><small>${h.n} modèles</small></div>
     </div>
-    ${skyLine(skyDay(fc.now.slice(0, 10), fc.latitude, fc.longitude, fc.timezone))}`;
+    ${skyLine(sky, fc.now)}`;
   // Ciel animé selon le temps qu'il fait : soleil, nuages, pluie, neige, éclairs, vent.
   startScene($('#hero'), { code: h.code, isDay: h.isDay, wind: h.wind, gust: h.gust, anchor: $('#hero .hero-icon') });
+  paintSky($('#hero').dataset.sky, dayPhase(fc.now, sky));
+}
+
+// Tout l'écran prend la couleur du ciel (voir app.css), barres du téléphone comprises.
+function paintSky(kind, phase) {
+  const root = document.documentElement;
+  root.dataset.sky = kind;
+  if (phase) root.dataset.phase = phase; else delete root.dataset.phase;
+  const css = getComputedStyle(root);
+  const top = css.getPropertyValue('--sky-a').trim(), bottom = css.getPropertyValue('--sky-c').trim();
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', top);
+  try { window.MeteoApp?.setBars?.(top, bottom); } catch { /* ancienne version de l'appli */ }
+}
+
+const minutes = (hm) => (hm ? +hm.slice(0, 2) * 60 + +hm.slice(3, 5) : null);
+
+// Aube et crépuscule : de 40 min avant à 50 min après le lever, de 50 min avant à 40 min après le coucher.
+function dayPhase(now, k) {
+  const t = minutes(now.slice(11, 16)), rise = minutes(k.sunrise), set = minutes(k.sunset);
+  if (rise != null && t >= rise - 40 && t <= rise + 50) return 'dawn';
+  if (set != null && t >= set - 50 && t <= set + 40) return 'dusk';
+  return null;
 }
 
 const hh = (t) => (t ? t.replace(/^0/, '').replace(':', 'h') : '–');
 
-function skyLine(k) {
-  return `<div class="hero-sky">
-    <span>☀️ Lever <b>${hh(k.sunrise)}</b> · coucher <b>${hh(k.sunset)}</b></span>
-    <span>${k.emoji} Lune : lever <b>${hh(k.moonrise)}</b> · coucher <b>${hh(k.moonset)}</b> · ${k.name.toLowerCase()} (${k.moonLit} %)</span>
+// Course du soleil dans la journée (arc), puis la lune.
+function skyLine(k, now) {
+  const rise = minutes(k.sunrise), set = minutes(k.sunset), t = minutes(now.slice(11, 16));
+  let arc = '';
+  if (rise != null && set != null && set > rise) {
+    const W = 360, H = 86, x0 = 18, x1 = W - 18, base = 64, top = 10;
+    const pt = (f) => [x0 + f * (x1 - x0), base - (base - top) * Math.sin(Math.PI * f)];
+    const path = (a, b) => Array.from({ length: 41 }, (_, i) => pt(a + ((b - a) * i) / 40)).map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join('');
+    const f = Math.max(0, Math.min(1, (t - rise) / (set - rise)));
+    const up = t > rise && t < set;
+    const [sx, sy] = pt(f);
+    const len = set - rise;
+    arc = `<svg class="sun-arc" viewBox="0 0 ${W} ${H}" role="img" aria-label="Soleil : lever ${hh(k.sunrise)}, coucher ${hh(k.sunset)}">
+      <defs>
+        <linearGradient id="arc-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffd27a" stop-opacity=".45"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></linearGradient>
+        <radialGradient id="arc-sun"><stop offset="0" stop-color="#fff6c8"/><stop offset=".55" stop-color="#ffc53d"/><stop offset="1" stop-color="#ffc53d" stop-opacity="0"/></radialGradient>
+      </defs>
+      <line x1="4" x2="${W - 4}" y1="${base}" y2="${base}" stroke="rgb(255 255 255 / 25%)" stroke-dasharray="2 4"/>
+      <path d="${path(0, 1)}" fill="none" stroke="rgb(255 255 255 / 28%)" stroke-width="1.5" stroke-dasharray="3 5"/>
+      ${f > 0 ? `<path d="${path(0, f)}L${sx.toFixed(1)},${base}L${x0},${base}Z" fill="url(#arc-fill)"/><path d="${path(0, f)}" fill="none" stroke="#ffd27a" stroke-width="2.5" stroke-linecap="round"/>` : ''}
+      ${up ? `<circle cx="${sx}" cy="${sy}" r="14" fill="url(#arc-sun)"/><circle cx="${sx}" cy="${sy}" r="5.5" fill="#fff3c4"/>` : ''}
+      <text x="${x0}" y="${H - 4}" text-anchor="start">↑ <tspan class="big">${hh(k.sunrise)}</tspan></text>
+      <text x="${W / 2}" y="${H - 4}" text-anchor="middle">${Math.floor(len / 60)} h ${String(len % 60).padStart(2, '0')} de jour</text>
+      <text x="${x1}" y="${H - 4}" text-anchor="end"><tspan class="big">${hh(k.sunset)}</tspan> ↓</text>
+    </svg>`;
+  }
+  return `<div class="hero-sky">${arc}
+    <div class="sky-moon">${k.emoji} <span>Lune ${k.name.toLowerCase()} (${k.moonLit} %) · lever <b>${hh(k.moonrise)}</b> · coucher <b>${hh(k.moonset)}</b></span></div>
   </div>`;
 }
 
+// Couleur d'une température (froid bleu → chaud rouge), pour la courbe et les barres des 10 jours.
+function tempColor(t) {
+  const stops = [[-5, [165, 216, 255]], [5, [116, 192, 252]], [10, [99, 230, 190]], [15, [192, 235, 117]], [20, [255, 212, 59]], [25, [255, 169, 77]], [30, [255, 107, 107]], [36, [230, 73, 128]]];
+  if (t == null) return '#fff';
+  let i = stops.findIndex(([k]) => k > t);
+  if (i === -1) return `rgb(${stops.at(-1)[1]})`;
+  if (i === 0) return `rgb(${stops[0][1]})`;
+  const [k0, c0] = stops[i - 1], [k1, c1] = stops[i];
+  const f = (t - k0) / (k1 - k0);
+  return `rgb(${c0.map((c, j) => Math.round(c + (c1[j] - c) * f)).join(',')})`;
+}
+
+// 48 h : une colonne par heure, et la courbe des températures qui court derrière les valeurs.
 function renderHourly(hours) {
-  $('#hourly').innerHTML = hours.map((h) => `
-    <div class="hour ${h.isDay ? '' : 'night'}">
-      <div class="h">${+h.time.slice(11, 13)}h</div>
+  const COL = 56, LIFT = 28;
+  const temps = hours.map((h) => h.temp).filter((t) => t != null);
+  const lo = Math.min(...temps), hi = Math.max(...temps);
+  const off = (t) => (t == null ? LIFT : Math.round((1 - (t - lo) / (hi - lo || 1)) * LIFT));
+  const pts = hours.map((h, i) => [i * COL + COL / 2, off(h.temp) + 26, h.temp]).filter((p) => p[2] != null);
+  // Courbe lissée (Catmull-Rom → Bézier).
+  let d = pts.length ? `M${pts[0][0]},${pts[0][1]}` : '';
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    d += `C${(p1[0] + (p2[0] - p0[0]) / 6).toFixed(1)},${(p1[1] + (p2[1] - p0[1]) / 6).toFixed(1)} ${(p2[0] - (p3[0] - p1[0]) / 6).toFixed(1)},${(p2[1] - (p3[1] - p1[1]) / 6).toFixed(1)} ${p2[0]},${p2[1]}`;
+  }
+  const W = hours.length * COL, H = 62;
+  const stops = pts.filter((_, i) => i % 3 === 0).map((p) => `<stop offset="${(p[0] / W).toFixed(3)}" stop-color="${tempColor(p[2])}"/>`).join('');
+  const curve = pts.length > 1 ? `<svg class="hourly-curve" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true">
+      <defs><linearGradient id="tc" x1="0" x2="${W}" y1="0" y2="0" gradientUnits="userSpaceOnUse">${stops}</linearGradient>
+      <linearGradient id="tf" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+      <path d="${d}L${pts.at(-1)[0]},${H}L${pts[0][0]},${H}Z" fill="url(#tf)"/>
+      <path d="${d}" fill="none" stroke="url(#tc)" stroke-width="2.5" stroke-linecap="round"/>
+      ${pts.map((p) => `<circle cx="${p[0]}" cy="${p[1]}" r="2.5" fill="${tempColor(p[2])}"/>`).join('')}
+    </svg>` : '';
+  $('#hourly').innerHTML = `<div class="hourly-track">${curve}${hours.map((h, i) => `
+    <div class="hour ${i === 0 ? 'now' : h.isDay ? '' : 'night'}">
+      <div class="h">${i === 0 ? 'Maint.' : `${+h.time.slice(11, 13)}h`}</div>
       <div class="e">${codeEmoji(h.code, h.isDay)}</div>
-      <div class="t">${r0(h.temp)}°</div>
+      <div class="t"><span style="margin-top:${off(h.temp)}px">${r0(h.temp)}°</span></div>
       <div class="p">${h.pop >= 15 ? `${h.pop} %` : ''}</div>
-    </div>`).join('');
+      <div class="w">${arrow(h.dir)} ${r0(kmh(h.wind))}</div>
+    </div>`).join('')}</div>`;
 }
 
 // Échelle de couleurs proche de Windguru (nœuds).
@@ -210,6 +288,7 @@ function renderDays(fc) {
   const all = fc.days.filter((d) => d.min != null);
   const lo = Math.min(...all.map((d) => d.min)), hi = Math.max(...all.map((d) => d.max));
   const open = new Set([...document.querySelectorAll('#days details[open]')].map((e) => e.dataset.date));
+  const nowT = all[0]?.date === fc.now.slice(0, 10) ? fc.hours[0]?.temp : null;
   $('#days').innerHTML = all.map((d, i) => {
     const date = new Date(d.date + 'T12:00Z');
     const name = i === 0 ? 'Auj.' : i === 1 ? 'Dem.' : FR_DAYS[date.getUTCDay()];
@@ -217,7 +296,7 @@ function renderDays(fc) {
     return `<details class="day-wrap" data-date="${d.date}"${open.has(d.date) ? ' open' : ''}><summary class="day">
       <div class="name">${name}<small>${date.getUTCDate()}/${date.getUTCMonth() + 1}</small></div>
       <div class="e">${codeEmoji(d.code, true)}</div>
-      <div class="range"><span style="left:${left}%;width:${Math.max(width, 3)}%"></span></div>
+      <div class="range"><span style="left:${left}%;width:${Math.max(width, 3)}%;--c0:${tempColor(d.min)};--c1:${tempColor(d.max)}"></span>${i === 0 && nowT != null ? `<i class="now" style="left:${Math.min(100, Math.max(0, ((nowT - lo) / (hi - lo || 1)) * 100))}%"></i>` : ''}</div>
       <div class="temps"><span class="lo">${r0(d.min)}°</span><span>${r0(d.max)}°</span></div>
       <div class="meta">
         <span class="${d.pop >= 30 ? 'wet' : ''}">💧 ${d.pop} %${d.precip >= 0.5 ? ` · ${d.precip} mm` : ''}</span>
@@ -586,7 +665,8 @@ setInterval(() => { if (document.visibilityState === 'visible') load(); }, 15 * 
 // et un bouton ouvre les réglages du widget.
 if (window.MeteoApp) {
   const b = document.createElement('button');
-  b.className = 'icon-btn'; b.id = 'settings'; b.setAttribute('aria-label', 'Réglages du widget et des alertes'); b.textContent = '⚙️';
+  b.className = 'icon-btn'; b.id = 'settings'; b.setAttribute('aria-label', 'Réglages du widget et des alertes');
+  b.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></g></svg>';
   b.onclick = () => window.MeteoApp.openSettings();
   $('#refresh').after(b);
   document.documentElement.classList.add('in-app');

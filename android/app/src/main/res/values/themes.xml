@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Appli complète : suit le thème clair ou sombre du téléphone (la page aussi). -->
+    <!-- Appli complète : la page peint tout l'écran aux couleurs du ciel, barres du téléphone comprises. -->
     <style name="AppTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:statusBarColor">#1D5FA8</item>
-        <item name="android:windowBackground">@android:color/white</item>
+        <item name="android:statusBarColor">#17457E</item>
+        <item name="android:windowBackground">@color/app_sky</item>
+        <item name="android:navigationBarColor">#081A33</item>
     </style>
 </resources>
