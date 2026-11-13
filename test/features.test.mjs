@@ -149,3 +149,8 @@ test('détail du jour : moments, tranches de 3 h et résumé', () => {
   assert.equal(text.length, 3); // la nuit n'est pas racontée
   assert.match(text[1], /^Après-midi : pluie, 16 à 19°, 3\.6 mm de pluie \(80 %\), vent assez fort d'E \(raf\. 52 km\/h\), mer 1\.4 m\.$/);
 });
+
+test('détail du jour : la neige l\'emporte sur les averses', () => {
+  const hours = [80, 80, 73, 73, 80, 73].map((code, i) => ({ time: `2026-11-14T${String(6 + i).padStart(2, '0')}:00`, code, temp: 1, isDay: true }));
+  assert.equal(dayPeriods(hours, null, '2026-11-14')[0].code, 73);
+});

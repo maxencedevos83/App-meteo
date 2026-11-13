@@ -1,6 +1,6 @@
 // Détail d'une journée de la prévision : quatre moments (nuit, matin, après-midi, soirée), tranches de 3 h
 // et une phrase de résumé. Module partagé (navigateur et tests Node).
-import { dirLabel, kmh } from './ensemble.js';
+import { codeLabel, codeSeverity, dirLabel, kmh } from './ensemble.js';
 
 export const PERIODS = [
   { name: 'Nuit', from: 0, to: 6 },
@@ -24,7 +24,8 @@ function dominantCode(hs) {
   const counts = new Map();
   for (const c of codes) counts.set(c, (counts.get(c) || 0) + 1);
   const frequent = [...counts].filter(([, n]) => n * 3 >= codes.length).map(([c]) => c);
-  return Math.max(...(frequent.length ? frequent : codes));
+  // Le plus grave d'abord, puis le plus marqué (ex. forte pluie avant pluie faible).
+  return (frequent.length ? frequent : codes).reduce((a, b) => (codeSeverity(b) > codeSeverity(a) || (codeSeverity(b) === codeSeverity(a) && b > a) ? b : a));
 }
 
 function summarize(hs, sea) {
@@ -79,20 +80,8 @@ function windWords(kn) {
   return 'coup de vent';
 }
 
-function weatherWords(code) {
-  if (code == null) return '';
-  if (code >= 95) return 'orageux';
-  if (code >= 71 && code <= 77) return 'neige';
-  if (code >= 85 && code <= 86) return 'averses de neige';
-  if (code >= 80) return 'averses';
-  if (code >= 61) return 'pluie';
-  if (code >= 51) return 'bruine';
-  if (code >= 45) return 'brouillard';
-  if (code === 3) return 'couvert';
-  if (code === 2) return 'nuageux';
-  if (code === 1) return 'peu nuageux';
-  return 'ensoleillé';
-}
+// Libellés communs avec le reste de l'appli (« Pluie faible », « Averses »…), en minuscules dans la phrase.
+const weatherWords = (code) => (code == null ? '' : codeLabel(code).toLowerCase());
 
 /** Une phrase par moment de la journée, ex. « Matin : ensoleillé, 14 à 19°, petite brise d'E (raf. 30 km/h). » */
 export function dayText(periods) {

@@ -228,6 +228,7 @@ function renderDays(fc) {
       </div>
     </summary><div class="day-detail">${dayDetail(fc, d.date)}</div></details>`;
   }).join('');
+  agri.fc = fc;
   agri.load(fc);
 }
 
@@ -259,15 +260,20 @@ function dayDetail(fc, date) {
 
 // Données agricoles (Open-Meteo) : ensoleillement, évapotranspiration, UV, sol. Chargées une fois par lieu.
 const agri = {
-  key: null, data: null,
+  key: null, data: null, at: 0, pending: null,
   async load(fc) {
     const key = `${fc.latitude},${fc.longitude}`;
-    if (this.key !== key) {
-      this.key = key; this.data = null;
-      try { this.data = await fetchAgri(fc.latitude, fc.longitude, fc.timezone); } catch { this.data = {}; }
-      if (this.key !== key) return;
+    // Nouveau lieu, échec précédent (données vides) ou données de plus d'une heure : on recharge.
+    const stale = this.key !== key || !this.data || !Object.keys(this.data).length || Date.now() - this.at > 3600000;
+    if (stale && this.pending !== key) {
+      this.pending = key;
+      const data = await fetchAgri(fc.latitude, fc.longitude, fc.timezone).catch(() => null);
+      if (this.pending === key) this.pending = null;
+      const cur = `${this.fc?.latitude},${this.fc?.longitude}`;
+      if (cur !== key) return; // lieu changé entre-temps : ces données ne sont plus les bonnes
+      if (data) { this.key = key; this.data = data; this.at = Date.now(); }
     }
-    if (!this.data) return;
+    if (this.key !== key || !this.data) return;
     document.querySelectorAll('[data-agri]').forEach((el) => {
       const a = this.data[el.dataset.agri];
       if (!a) return;
@@ -293,7 +299,7 @@ function renderLinks(fc) {
       spain
         ? ['Bulletin maritime AEMET', 'https://www.aemet.es/es/eltiempo/prediccion/maritima']
         : ['Météo marine Météo-France (bulletins côtiers)', 'https://meteofrance.com/meteo-marine'],
-      !spain && ['Bulletin détaillé de Toulon (Météo Consult)', 'https://marine.meteoconsult.fr/meteo-marine/bulletin-detaille/port-62/previsions-meteo-toulon-aujourdhui'],
+      !spain && distanceKm(fc, { latitude: 43.12, longitude: 5.93 }) < 60 && ['Bulletin détaillé de Toulon (Météo Consult)', 'https://marine.meteoconsult.fr/meteo-marine/bulletin-detaille/port-62/previsions-meteo-toulon-aujourdhui'],
       fc.windguru?.spotId && [`Windguru${fc.windguru.spotName ? ` – ${fc.windguru.spotName}` : ''}`, `https://www.windguru.cz/${fc.windguru.spotId}`],
       ['Vagues et houle (Windy)', `https://www.windy.com/?waves,${lat},${lon},9`],
     ]],

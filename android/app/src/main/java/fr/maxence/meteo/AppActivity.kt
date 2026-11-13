@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.webkit.ConsoleMessage
@@ -19,6 +20,7 @@ import java.io.ByteArrayInputStream
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlin.concurrent.thread
 
 /**
  * L'appli complète, dans l'APK : l'interface (prévision 48 h, vent, 10 jours détaillés, sorties, mer, radars,
@@ -28,12 +30,15 @@ import java.net.URL
 class AppActivity : Activity() {
 
     private lateinit var web: WebView
-    private var geoCallback: Pair<String, GeolocationPermissions.Callback>? = null
+    private val geoCallbacks = mutableListOf<Pair<String, GeolocationPermissions.Callback>>()
+    private var asking = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AlertJob.schedule(this)
+        askStartupPermissions()
+        refreshWidget()
         web = WebView(this)
         web.settings.apply {
             javaScriptEnabled = true
@@ -57,8 +62,9 @@ class AppActivity : Activity() {
             override fun onGeolocationPermissionsShowPrompt(origin: String, callback: GeolocationPermissions.Callback) {
                 if (Position.granted(this@AppActivity)) callback.invoke(origin, true, false)
                 else {
-                    geoCallback = origin to callback
-                    requestPermissions(arrayOf(android.Manifest.permission.ACCESS_COARSE_LOCATION), GEO)
+                    // Une seule demande à la fois : les suivantes attendent la réponse de la première.
+                    geoCallbacks.add(origin to callback)
+                    if (!asking) ask(arrayOf(android.Manifest.permission.ACCESS_COARSE_LOCATION))
                 }
             }
 
@@ -76,12 +82,43 @@ class AppActivity : Activity() {
         web.saveState(outState)
     }
 
+    // Comme les réglages : notifications (Android 13+) et position pour le widget, demandées au premier lancement.
+    private fun askStartupPermissions() {
+        val prefs = getSharedPreferences("meteo", MODE_PRIVATE)
+        val perms = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= 33 && !prefs.getBoolean("notif_asked", false) &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            prefs.edit().putBoolean("notif_asked", true).apply()
+            perms.add(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+        if (Position.follow(this) && !Position.granted(this)) perms.add(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+        if (perms.isNotEmpty()) ask(perms.toTypedArray())
+    }
+
+    private fun ask(perms: Array<String>) {
+        asking = true
+        requestPermissions(perms, PERMS)
+    }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode != GEO) return
-        val ok = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
-        geoCallback?.let { (origin, cb) -> cb.invoke(origin, ok, false) }
-        geoCallback = null
+        if (requestCode != PERMS) return
+        asking = false
+        val ok = Position.granted(this)
+        geoCallbacks.forEach { (origin, cb) -> cb.invoke(origin, ok, false) }
+        geoCallbacks.clear()
+        if (android.Manifest.permission.ACCESS_COARSE_LOCATION in permissions) refreshWidget()
+    }
+
+    /** Met à jour le widget et les alertes en arrière-plan, comme à l'ouverture des réglages. */
+    private fun refreshWidget() {
+        val ctx = applicationContext
+        thread {
+            val data = MeteoData.refresh(ctx)
+            runCatching { MeteoWidget.render(ctx, data) }.onFailure { Log.e(TAG, "Widget", it) }
+            if (MeteoData.lastError(ctx) == null) runCatching { Notifier.notifyNew(ctx, data) }.onFailure { Log.e(TAG, "Alertes", it) }
+        }
     }
 
     @Deprecated("Bouton retour : ferme d'abord une page ouverte dans l'appli")
@@ -150,7 +187,7 @@ class AppActivity : Activity() {
 
         /** Appelé par la page une fois la prévision affichée (sert aussi à l'essai sur émulateur). */
         @JavascriptInterface
-        fun ready(place: String, days: Int) {
+        fun ready(place: String?, days: Int) {
             Log.i(TAG, "Appli affichée : $place, $days jours")
         }
     }
@@ -158,6 +195,6 @@ class AppActivity : Activity() {
     companion object {
         private const val HOST = "appassets.androidplatform.net"
         private const val TAG = "Meteo"
-        private const val GEO = 7
+        private const val PERMS = 7
     }
 }
