@@ -154,3 +154,20 @@ test('détail du jour : la neige l\'emporte sur les averses', () => {
   const hours = [80, 80, 73, 73, 80, 73].map((code, i) => ({ time: `2026-11-14T${String(6 + i).padStart(2, '0')}:00`, code, temp: 1, isDay: true }));
   assert.equal(dayPeriods(hours, null, '2026-11-14')[0].code, 73);
 });
+
+test('vigilance : même phénomène sur deux périodes = une seule alerte', () => {
+  const info = (onset, expires) => ({ language: 'fr-FR', onset, expires, headline: 'Vigilance jaune inondations',
+    parameter: [{ valueName: 'awareness_level', value: '2; yellow; Moderate' }, { valueName: 'awareness_type', value: '12; flooding' }],
+    area: [{ areaDesc: 'Var', geocode: [{ valueName: 'NUTS3', value: 'FR825' }, { valueName: 'EMMA_ID', value: 'FR083' }] }] });
+  const json = { warnings: [
+    { alert: { info: [info('2026-11-13T06:00:00+01:00', '2026-11-14T00:00:00+01:00')] } },
+    { alert: { info: [info('2026-11-14T00:00:00+01:00', '2026-11-14T16:00:00+01:00')] } },
+  ] };
+  const v = parseMeteoAlarm(json, { dept: '83', now: new Date('2026-11-13T07:00:00Z') });
+  assert.equal(v.length, 1);
+  assert.equal(v[0].onset, '2026-11-13T06:00:00+01:00');
+  assert.equal(v[0].expires, '2026-11-14T16:00:00+01:00');
+  const fc = { now: '2026-11-13T08:00', hours: [], days: [], activities: [] };
+  const twice = [v[0], { ...v[0], onset: 'x' }];
+  assert.equal(buildAlerts(fc, { vigilance: twice }).filter((a) => a.type === 'vigilance').length, 1);
+});

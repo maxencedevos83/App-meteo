@@ -44,12 +44,20 @@ object MeteoData {
             return refreshHome(context, near.path)
         }
         return try {
-            val json = LocalForecast.build(here.lat, here.lon, here.name)
+            // Réseau mobile capricieux : un second essai avant d'abandonner.
+            val json = try {
+                LocalForecast.build(here.lat, here.lon, here.name)
+            } catch (e: java.io.IOException) {
+                Log.w("Meteo", "Prévision locale : nouvel essai (${e.javaClass.simpleName})")
+                LocalForecast.build(here.lat, here.lon, here.name)
+            }
             Log.i("Meteo", "Prévision locale : ${here.name} ${json.optString("temp")}° ${json.optString("cond")}")
             prefs(context).edit().putString("json", json.toString()).remove("error").apply()
             json
         } catch (e: Exception) {
-            Log.e("Meteo", "Prévision locale impossible", e)
+            // Pas de réseau ou serveur muet : situation normale, la dernière prévision reste affichée.
+            if (e is java.io.IOException) Log.w("Meteo", "Prévision locale impossible (réseau) : $e")
+            else Log.e("Meteo", "Prévision locale impossible", e)
             prefs(context).edit().putString("error", e.message ?: e.javaClass.simpleName).apply()
             cached(context)
         }

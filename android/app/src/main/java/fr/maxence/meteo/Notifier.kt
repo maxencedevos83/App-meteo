@@ -7,7 +7,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import org.json.JSONObject
 
@@ -156,7 +155,7 @@ object Notifier {
     private fun show(context: Context, manager: NotificationManager, a: Alert) {
         val strong = a.level >= 3
         val open = PendingIntent.getActivity(
-            context, 2, Intent(Intent.ACTION_VIEW, Uri.parse(MeteoData.siteUrl(context))), PendingIntent.FLAG_IMMUTABLE,
+            context, 2, Intent(context, AppActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_IMMUTABLE,
         )
         val n = Notification.Builder(context, if (strong) CHANNEL_STRONG else CHANNEL)
             .setSmallIcon(if (strong) android.R.drawable.ic_dialog_alert else android.R.drawable.ic_dialog_info)

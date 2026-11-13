@@ -6,7 +6,6 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.provider.AlarmClock
 import android.view.View
@@ -79,7 +78,8 @@ class MeteoWidget : AppWidgetProvider() {
                 Size.LARGE -> R.layout.widget_large
             }
             val v = RemoteViews(context.packageName, layout)
-            val open = Intent(Intent.ACTION_VIEW, Uri.parse(MeteoData.siteUrl(context)))
+            // Appui sur le widget : l'appli complète de l'APK (plus le site).
+            val open = Intent(context, AppActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             v.setOnClickPendingIntent(R.id.root, PendingIntent.getActivity(context, 0, open, PendingIntent.FLAG_IMMUTABLE))
             val refresh = Intent(context, MeteoWidget::class.java).setAction(ACTION_REFRESH)
             v.setOnClickPendingIntent(R.id.refresh, PendingIntent.getBroadcast(context, 1, refresh, PendingIntent.FLAG_IMMUTABLE))
