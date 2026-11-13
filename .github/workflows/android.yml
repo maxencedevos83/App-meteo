@@ -3,9 +3,9 @@ name: Widget Android
 on:
   push:
     branches: [main]
-    paths: ['android/**', '.github/workflows/android.yml', 'scripts/android/**']
+    paths: ['android/**', 'web/**', '.github/workflows/android.yml', 'scripts/android/**']
   pull_request:
-    paths: ['android/**', '.github/workflows/android.yml', 'scripts/android/**']
+    paths: ['android/**', 'web/**', '.github/workflows/android.yml', 'scripts/android/**']
   workflow_dispatch:
 
 permissions:
@@ -75,6 +75,7 @@ jobs:
           name: emulateur
           path: |
             screen.png
+            app.png
             crash.txt
             errors.txt
           if-no-files-found: ignore
@@ -86,4 +87,4 @@ jobs:
         run: |
           tag="widget-v${{ github.run_number }}"
           gh release create "$tag" meteo-widget.apk --title "Widget Android v${{ github.run_number }}" \
-            --notes "Installez meteo-widget.apk sur le téléphone, puis ajoutez le widget « Météo fiable » à l'écran d'accueil." --latest
+            --notes "Installez meteo-widget.apk sur le téléphone, puis ouvrez l'appli « Météo fiable » (prévision complète) et ajoutez le widget à l'écran d'accueil." --latest

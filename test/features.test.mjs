@@ -121,3 +121,31 @@ test('Meteocat : mesures regroupées par heure locale', async () => {
   assert.equal(obs['2026-10-27T07:00'].w, 9.7);
   assert.equal(obs['2026-10-27T07:00'].p, 0.6);
 });
+
+// ---------- Détail des jours suivants ----------
+import { dayPeriods, threeHourly, dayText } from '../web/js/daydetail.js';
+
+test('détail du jour : moments, tranches de 3 h et résumé', () => {
+  const hours = Array.from({ length: 48 }, (_, i) => {
+    const d = i < 24 ? '2026-11-13' : '2026-11-14', h = i % 24;
+    return { time: `${d}T${String(h).padStart(2, '0')}:00`, temp: 10 + h / 2, feels: 9 + h / 2, precip: h >= 14 && h < 17 ? 1.2 : 0,
+      pop: h >= 14 && h < 17 ? 80 : 10, wind: h >= 12 ? 18 : 6, gust: h >= 12 ? 28 : 10, dir: 90, cloud: 50, rh: 70,
+      code: h >= 14 && h < 17 ? 63 : 1, isDay: h >= 7 && h < 17, confidence: 70 };
+  });
+  const marine = hours.map((h) => ({ time: h.time, wave: h.wind > 10 ? 1.4 : 0.3 }));
+  const p = dayPeriods(hours, marine, '2026-11-14');
+  assert.deepEqual(p.map((x) => x.name), ['Nuit', 'Matin', 'Après-midi', 'Soirée']);
+  const pm = p[2];
+  assert.equal(pm.precip, 3.6);
+  assert.equal(pm.code, 63);
+  assert.equal(pm.wave, 1.4);
+  const rows = threeHourly(hours, marine, '2026-11-14');
+  assert.equal(rows.length, 8);
+  assert.equal(rows[4].hour, 12);
+  assert.equal(rows[4].precip, 1.2); // 12h à 15h : seule l'heure de 14h est pluvieuse
+  assert.equal(rows[5].precip, 2.4);
+  assert.equal(rows[4].gust, 28);
+  const text = dayText(p);
+  assert.equal(text.length, 3); // la nuit n'est pas racontée
+  assert.match(text[1], /^Après-midi : pluie, 16 à 19°, 3\.6 mm de pluie \(80 %\), vent assez fort d'E \(raf\. 52 km\/h\), mer 1\.4 m\.$/);
+});

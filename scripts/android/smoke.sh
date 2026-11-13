@@ -17,6 +17,11 @@ adb shell am start -W -n $PKG/.MainActivity
 adb emu geo fix 2.3522 48.8566 || true
 adb shell cmd jobscheduler run -f $PKG 4242 || true
 sleep 20
+# L'appli complète (interface embarquée dans l'APK) : la prévision doit s'afficher.
+adb shell am start -W -n $PKG/.AppActivity
+for i in $(seq 1 30); do adb logcat -d -s Meteo:I | grep -q "Appli affichée" && break; sleep 2; done
+sleep 3
+adb exec-out screencap -p > app.png || true
 adb shell input keyevent KEYCODE_HOME
 sleep 3
 echo "===== Plantages ====="
@@ -32,4 +37,5 @@ adb logcat -d -s Meteo:E | tee errors.txt
 if [ -s crash.txt ]; then echo "PLANTAGE DÉTECTÉ"; exit 1; fi
 if grep -q " E Meteo" errors.txt; then echo "ERREUR DANS L'APPLI"; exit 1; fi
 if ! grep -q "Prévision locale" position.txt; then echo "PRÉVISION LOCALE ABSENTE"; exit 1; fi
+if ! grep -q "Appli affichée" position.txt; then echo "APPLI NON AFFICHÉE"; adb logcat -d -s Meteo:W | tail -40; exit 1; fi
 echo "Aucun plantage."

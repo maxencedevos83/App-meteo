@@ -55,7 +55,7 @@
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>10 jours</h2></div>
+      <div class="card-head"><h2>10 jours</h2><span class="hint">touchez un jour pour le détail</span></div>
       <div id="days" class="days"></div>
     </section>
 
@@ -76,6 +76,7 @@
       <div class="tabs" role="tablist">
         <button id="tab-rain" class="chip on" role="tab" aria-selected="true">🌧 Pluie</button>
         <button id="tab-wind" class="chip" role="tab" aria-selected="false">💨 Vent</button>
+        <button id="tab-waves" class="chip" role="tab" aria-selected="false">🌊 Vagues</button>
       </div>
       <div id="radar" class="radar"></div>
       <div id="wind-map" class="radar" hidden></div>
@@ -83,6 +84,11 @@
         <button id="radar-play" class="chip">▶ Animer</button>
         <input id="radar-slider" type="range" min="0" max="0" value="0" aria-label="Heure du radar">
       </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Bulletins et radars</h2><span class="hint">mer, pluie, agricole</span></div>
+      <div id="links" class="links"></div>
     </section>
 
     <section class="card" id="history-card" hidden>
