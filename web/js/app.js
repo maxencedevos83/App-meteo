@@ -54,12 +54,22 @@ async function loadPlace(place) {
 // Au-delà de 5 km (Bormes village, La Londe, Cavalière…), la prévision de l'endroit même est plus juste.
 const HOME_RADIUS_KM = 5;
 
-function currentPosition() {
+function locate(options) {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject(new Error('localisation indisponible'));
-    // Position exacte (GPS) : à quelques km près, on tombait parfois sur la commune voisine.
-    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, maximumAge: 2 * 60000, timeout: 20000 });
+    navigator.geolocation.getCurrentPosition(resolve, reject, options);
   });
+}
+
+async function currentPosition() {
+  try {
+    // Position exacte (GPS) : à quelques km près, on tombait parfois sur la commune voisine.
+    return await locate({ enableHighAccuracy: true, maximumAge: 2 * 60000, timeout: 10000 });
+  } catch (e) {
+    // Refusée : inutile d'insister. GPS trop lent (intérieur) : position approximative récente, sans attendre.
+    if (e?.code === 1) throw e;
+    return locate({ enableHighAccuracy: false, maximumAge: 30 * 60000, timeout: 5000 });
+  }
 }
 
 // Mode « ma position » : ville où l'on se trouve, ou lieu principal si l'on est tout près.
@@ -81,7 +91,9 @@ async function gpsPlace() {
 async function load() {
   const btn = $('#refresh');
   btn.classList.add('spin');
-  let other = store.get('place');
+  // Par défaut (aucun lieu choisi), l'appli suit la position du téléphone, comme le widget.
+  let other = store.get('place') ?? { gps: true };
+  if (other.home) other = null;
   try {
     let fc;
     if (other?.gps) other = await gpsPlace().catch(() => store.get('gpsName') && { name: `📍 ${store.get('gpsName').name}`, ...store.get('gpsName'), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
@@ -628,13 +640,13 @@ function setupSearch() {
   const list = $('#search-results');
   let timer;
   $('#place-btn').onclick = () => { dlg.showModal(); input.focus(); };
-  $('#home-btn').onclick = () => { store.set('place', null); dlg.close(); load(); };
+  $('#home-btn').onclick = () => { store.set('place', { home: true }); dlg.close(); load(); };
   $('#gps-btn').onclick = () => { store.set('place', { gps: true }); dlg.close(); load(); };
   trackedPlaces().then((places) => {
     $('#tracked').innerHTML = places.map((p, i) => `<li><button type="button" data-i="${i}">⭐ ${esc(p.place)}<small>prévision complète</small></button></li>`).join('');
     $('#tracked').querySelectorAll('button').forEach((b) => (b.onclick = () => {
       const p = places[+b.dataset.i];
-      store.set('place', p.path === 'data/' ? null : { tracked: p.path });
+      store.set('place', p.path === 'data/' ? { home: true } : { tracked: p.path });
       dlg.close();
       load();
     }));
