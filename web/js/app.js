@@ -94,12 +94,19 @@ async function load() {
   // Par défaut (aucun lieu choisi), l'appli suit la position du téléphone, comme le widget.
   let other = store.get('place') ?? { gps: true };
   if (other.home) other = null;
+  const followGps = !!other?.gps;
   try {
     let fc;
-    if (other?.gps) other = await gpsPlace().catch(() => store.get('gpsName') && { name: `📍 ${store.get('gpsName').name}`, ...store.get('gpsName'), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+    if (followGps) other = await gpsPlace().catch(() => store.get('gpsName') && { name: `📍 ${store.get('gpsName').name}`, ...store.get('gpsName'), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
     if (other?.tracked) fc = await loadHome(other.tracked);
-    else if (other) fc = await loadPlace(other);
-    else {
+    else if (other) {
+      fc = await loadPlace(other).catch(async (e) => {
+        // Prévision de l'endroit impossible (réseau, modèles muets) : plutôt celle du lieu principal qu'un écran vide.
+        if (!followGps) throw e;
+        console.warn(`Prévision locale impossible (${e.message}) : lieu principal`);
+        return loadHome();
+      });
+    } else {
       try { fc = await loadHome(); }
       catch (e) {
         // Pas encore de données serveur (première installation) : calcul direct dans le navigateur.
