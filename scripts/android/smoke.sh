@@ -7,6 +7,7 @@ adb install -r "$APK"
 adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS || true
 # Position fictive à Paris : le widget doit calculer la prévision de la ville sur le téléphone.
 adb shell pm grant $PKG android.permission.ACCESS_COARSE_LOCATION || true
+adb shell pm grant $PKG android.permission.ACCESS_FINE_LOCATION || true
 adb shell pm grant $PKG android.permission.ACCESS_BACKGROUND_LOCATION || true
 adb shell cmd location set-location-enabled true || true
 adb emu geo fix 2.3522 48.8566 || true

@@ -32,6 +32,7 @@ class AppActivity : Activity() {
     private lateinit var web: WebView
     private val geoCallbacks = mutableListOf<Pair<String, GeolocationPermissions.Callback>>()
     private var asking = false
+    private var lastRefresh = 0L
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,7 +65,7 @@ class AppActivity : Activity() {
                 else {
                     // Une seule demande à la fois : les suivantes attendent la réponse de la première.
                     geoCallbacks.add(origin to callback)
-                    if (!asking) ask(arrayOf(android.Manifest.permission.ACCESS_COARSE_LOCATION))
+                    if (!asking) ask(Position.PERMISSIONS)
                 }
             }
 
@@ -92,8 +93,33 @@ class AppActivity : Activity() {
             prefs.edit().putBoolean("notif_asked", true).apply()
             perms.add(android.Manifest.permission.POST_NOTIFICATIONS)
         }
-        if (Position.follow(this) && !Position.granted(this)) perms.add(android.Manifest.permission.ACCESS_COARSE_LOCATION)
-        if (perms.isNotEmpty()) ask(perms.toTypedArray())
+        // Position exacte demandée une fois de plus à ceux qui n'avaient donné que l'approximative (anciennes versions) :
+        // à ~2 km près, la commune affichée et la prévision pouvaient être celles d'à côté.
+        if (Position.follow(this) && !Position.precise(this) && (!Position.granted(this) || !prefs.getBoolean("fine_asked", false))) {
+            prefs.edit().putBoolean("fine_asked", true).apply()
+            perms.addAll(Position.PERMISSIONS)
+        }
+        if (perms.isNotEmpty()) ask(perms.toTypedArray()) else askBackground()
+    }
+
+    /**
+     * Sans « Toujours autoriser », Android ne donne aucune position au widget appli fermée :
+     * il restait sur le lieu de la dernière ouverture de l'appli. On l'explique et on le propose une fois.
+     */
+    private fun askBackground() {
+        val prefs = getSharedPreferences("meteo", MODE_PRIVATE)
+        if (!Position.follow(this) || !Position.granted(this) || Position.backgroundGranted(this) || prefs.getBoolean("bg_asked", false)) return
+        prefs.edit().putBoolean("bg_asked", true).apply()
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Widget à votre position")
+            .setMessage(
+                "Pour que le widget affiche la météo de l'endroit où vous êtes, même quand l'appli est fermée, " +
+                    "Android demande l'autorisation « Toujours autoriser » pour la position" +
+                    (if (Build.VERSION.SDK_INT >= 30) " (choisissez-la sur l'écran suivant)." else "."),
+            )
+            .setPositiveButton("Autoriser") { _, _ -> ask(arrayOf(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION)) }
+            .setNegativeButton("Plus tard", null)
+            .show()
     }
 
     private fun ask(perms: Array<String>) {
@@ -108,11 +134,19 @@ class AppActivity : Activity() {
         val ok = Position.granted(this)
         geoCallbacks.forEach { (origin, cb) -> cb.invoke(origin, ok, false) }
         geoCallbacks.clear()
-        if (android.Manifest.permission.ACCESS_COARSE_LOCATION in permissions) refreshWidget()
+        if (permissions.any { it in Position.PERMISSIONS || it == android.Manifest.permission.ACCESS_BACKGROUND_LOCATION }) refreshWidget()
+        askBackground()
+    }
+
+    // Retour dans l'appli (elle restait souvent ouverte en arrière-plan) : le widget reprend la position actuelle.
+    override fun onResume() {
+        super.onResume()
+        if (System.currentTimeMillis() - lastRefresh > 2 * 60_000) refreshWidget()
     }
 
     /** Met à jour le widget et les alertes en arrière-plan, comme à l'ouverture des réglages. */
     private fun refreshWidget() {
+        lastRefresh = System.currentTimeMillis()
         val ctx = applicationContext
         thread {
             val data = MeteoData.refresh(ctx)
