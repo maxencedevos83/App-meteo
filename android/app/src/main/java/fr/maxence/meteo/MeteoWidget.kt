@@ -6,8 +6,11 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.location.Location
+import android.location.LocationManager
 import android.os.Bundle
 import android.provider.AlarmClock
+import android.util.Log
 import android.view.View
 import android.widget.RemoteViews
 import org.json.JSONObject
@@ -26,7 +29,21 @@ class MeteoWidget : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        if (intent.action == ACTION_REFRESH) refreshAsync(context)
+        when (intent.action) {
+            ACTION_REFRESH -> refreshAsync(context)
+            ACTION_MOVED -> {
+                // Le téléphone s'est déplacé : nouvelle prévision si l'on a bougé d'au moins 1 km,
+                // et au plus une fois toutes les 5 minutes.
+                @Suppress("DEPRECATION")
+                val loc = intent.getParcelableExtra<Location>(LocationManager.KEY_LOCATION_CHANGED) ?: return
+                val prefs = context.getSharedPreferences("meteo", Context.MODE_PRIVATE)
+                val now = System.currentTimeMillis()
+                if (!Position.follow(context) || !Position.movedFar(context, loc) || now - prefs.getLong("moved_at", 0) < 5 * 60_000) return
+                prefs.edit().putLong("moved_at", now).apply()
+                Log.i("Meteo", "Déplacement détecté : actualisation du widget")
+                refreshAsync(context)
+            }
+        }
     }
 
     private fun refreshAsync(context: Context) {
@@ -46,6 +63,7 @@ class MeteoWidget : AppWidgetProvider() {
 
     companion object {
         const val ACTION_REFRESH = "fr.maxence.meteo.REFRESH"
+        const val ACTION_MOVED = "fr.maxence.meteo.MOVED"
         private val ICON_FRAMES = listOf(
             R.id.icon_f0, R.id.icon_f1, R.id.icon_f2, R.id.icon_f3, R.id.icon_f4, R.id.icon_f5, R.id.icon_f6, R.id.icon_f7,
         )

@@ -26,15 +26,19 @@ object MeteoData {
     fun lastError(context: Context): String? = prefs(context).getString("error", null)
 
     // Autour du lieu principal, la prévision publiée (Windguru, stations, vigilance) reste la meilleure.
-    private const val HOME_RADIUS_KM = 15.0
+    // Au-delà de 5 km (Bormes village, La Londe, Cavalière…), le widget passe à la prévision de l'endroit même :
+    // à 15 km, il restait sur « Le Lavandou » dans toutes les communes voisines.
+    private const val HOME_RADIUS_KM = 5.0
 
     /**
      * Dernière prévision pour le widget : celle publiée par l'appli près du lieu principal,
      * sinon une prévision calculée sur le téléphone pour la ville où l'on se trouve.
      */
     fun refresh(context: Context): JSONObject? {
+        // Suivi des déplacements (re)programmé à chaque passage : il ne survit pas à un redémarrage du téléphone.
+        Position.watch(context)
         val here = if (Position.follow(context)) Position.current(context) else null
-        if (Position.follow(context)) Log.i("Meteo", if (here == null) "Position inconnue : lieu principal" else "Position : ${here.name}")
+        if (Position.follow(context) && here == null) Log.i("Meteo", "Position inconnue : lieu principal")
         if (here == null) return refreshHome(context, "data/")
         // Près d'un lieu suivi par l'appli (Le Lavandou, Cambrils…) : sa prévision complète publiée.
         val near = places(context).minByOrNull { LocalForecast.distanceKm(here.lat, here.lon, it.lat, it.lon) }

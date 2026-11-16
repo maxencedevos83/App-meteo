@@ -34,6 +34,7 @@ class MainActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var placeInfo: TextView
     private lateinit var backgroundButton: Button
+    private lateinit var preciseButton: Button
     private lateinit var preview: FrameLayout
     private lateinit var column: LinearLayout
     private var style = WidgetStyle.Style()
@@ -158,7 +159,7 @@ class MainActivity : Activity() {
 
         section("Lieu")
         add(CheckBox(this).apply {
-            text = "Suivre ma position (ville)"
+            text = "Suivre ma position"
             isChecked = Position.follow(this@MainActivity)
             setOnCheckedChangeListener { _, on ->
                 Position.setFollow(this@MainActivity, on)
@@ -173,6 +174,21 @@ class MainActivity : Activity() {
             setOnClickListener { requestPermissions(arrayOf(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION), 3) }
         }
         add(backgroundButton)
+        preciseButton = Button(this).apply {
+            text = "Utiliser la position exacte"
+            setOnClickListener {
+                // Refusée deux fois, Android ne la redemande plus : écran des autorisations de l'appli.
+                if (!shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_FINE_LOCATION) &&
+                    getSharedPreferences("meteo", MODE_PRIVATE).getBoolean("fine_asked", false)
+                ) {
+                    runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }
+                } else {
+                    getSharedPreferences("meteo", MODE_PRIVATE).edit().putBoolean("fine_asked", true).apply()
+                    requestPermissions(Position.PERMISSIONS, 2)
+                }
+            }
+        }
+        add(preciseButton)
 
         section("Prévision")
         label("Adresse des données de prévision")
@@ -228,7 +244,7 @@ class MainActivity : Activity() {
     }
 
     private fun askLocation() {
-        val perms = mutableListOf(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+        val perms = Position.PERMISSIONS.toMutableList()
         // Android 10 accepte les deux d'un coup ; à partir d'Android 11, « toujours » se demande à part.
         if (Build.VERSION.SDK_INT == 29) perms.add(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION)
         requestPermissions(perms.toTypedArray(), 2)
@@ -253,11 +269,14 @@ class MainActivity : Activity() {
         val city = getSharedPreferences("meteo", MODE_PRIVATE).getString("pos_name", null)
         placeInfo.text = when {
             !follow -> "Le widget affiche toujours le lieu principal (Le Lavandou)."
-            !granted -> "Autorisez la localisation pour que le widget suive la ville où vous êtes."
-            else -> (city?.let { "Dernière position : $it. " } ?: "") +
+            !granted -> "Autorisez la localisation pour que le widget suive l'endroit où vous êtes."
+            else -> (city?.let { "Dernière position : $it" + (Position.lastAccuracy(this)?.let { m -> " (à $m m près)" } ?: "") + ". " } ?: "") +
+                (if (!Position.precise(this)) "Position approximative (à ~2 km près, parfois la commune voisine) : touchez le bouton ci-dessous pour la position exacte. " else "") +
+                (if (!Position.backgroundGranted(this)) "Sans « Toujours autoriser », le widget ne change de lieu qu'à l'ouverture de l'appli. " else "") +
                 "Près du Lavandou, prévision complète avec Windguru ; ailleurs, Météo-France, ECMWF et ICON pour la ville où vous êtes."
         }
         backgroundButton.visibility = if (follow && granted && !Position.backgroundGranted(this)) View.VISIBLE else View.GONE
+        preciseButton.visibility = if (follow && granted && !Position.precise(this)) View.VISIBLE else View.GONE
     }
 
     private fun update(next: WidgetStyle.Style) {

@@ -51,27 +51,29 @@ async function loadPlace(place) {
 }
 
 // Autour du lieu principal, la prévision complète (Windguru, stations) reste la meilleure.
-const HOME_RADIUS_KM = 15;
+// Au-delà de 5 km (Bormes village, La Londe, Cavalière…), la prévision de l'endroit même est plus juste.
+const HOME_RADIUS_KM = 5;
 
 function currentPosition() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject(new Error('localisation indisponible'));
-    // Précision de la ville : pas besoin du GPS fin.
-    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, maximumAge: 30 * 60000, timeout: 15000 });
+    // Position exacte (GPS) : à quelques km près, on tombait parfois sur la commune voisine.
+    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, maximumAge: 2 * 60000, timeout: 20000 });
   });
 }
 
 // Mode « ma position » : ville où l'on se trouve, ou lieu principal si l'on est tout près.
 async function gpsPlace() {
   const pos = await currentPosition();
-  const here = { latitude: +pos.coords.latitude.toFixed(3), longitude: +pos.coords.longitude.toFixed(3) };
+  const here = { latitude: +pos.coords.latitude.toFixed(4), longitude: +pos.coords.longitude.toFixed(4) };
   // Près d'un lieu suivi (Le Lavandou, Cambrils…) : sa prévision complète.
   const near = (await trackedPlaces()).find((p) => distanceKm(here, p) <= HOME_RADIUS_KM);
   if (near) return { tracked: near.path };
   const cfg = await fetch('config.json').then((r) => r.json()).catch(() => null);
   if (cfg && distanceKm(here, cfg) <= HOME_RADIUS_KM) return null;
   const last = store.get('gpsName');
-  const name = last && distanceKm(here, last) < 3 ? last.name : await reverseGeocode(here.latitude, here.longitude).catch(() => 'Ma position');
+  // Nom de la commune redemandé dès 500 m de déplacement (les communes du littoral sont petites).
+  const name = last && distanceKm(here, last) < 0.5 ? last.name : await reverseGeocode(here.latitude, here.longitude).catch(() => 'Ma position');
   store.set('gpsName', { ...here, name });
   return { name: `📍 ${name}`, ...here, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone };
 }
