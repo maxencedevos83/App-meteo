@@ -435,12 +435,12 @@ function renderSessions(fc) {
   $('#sessions-card').hidden = !acts.length;
   $('#sessions').innerHTML = acts.map((a) => {
     const wins = a.windows.map((w) => `<span class="win ${w.score < 75 ? 'mid' : ''}">${dayWord(w.start, fc.now)} ${+w.start.slice(11, 13)}h–${+w.end.slice(11, 13) + 1}h
-      <small>· ${a.id === 'baignade' || a.id === 'balade' ? `${w.score}/100` : `${r0(kmh(w.wind))} km/h ${w.dir}`}${w.notes.length ? ` · ${esc(w.notes.join(', '))}` : ''}</small></span>`).join('');
+      <small>· ${a.id === 'baignade' || a.id === 'balade' ? `${w.score}/100` : a.id === 'velo' ? `${w.score}/100 · ${r0(kmh(w.wind))} km/h ${w.dir}` : `${r0(kmh(w.wind))} km/h ${w.dir}`}${w.notes.length ? ` · ${esc(w.notes.join(', '))}` : ''}</small></span>`).join('');
     // Bandeau 5 jours : une case par heure, couleur selon le score.
     const strip = a.scores.slice(0, 120).map((sc, i) => `<i style="background:${scoreColor(sc)}" title="${fc.hours[i]?.time.slice(5, 13).replace('T', ' ')}h : ${sc}"></i>`).join('');
     return `<div class="act"><div class="ico">${a.emoji}</div><div class="name">${a.label}</div>
       <div class="strip">${strip}</div>
-      <div class="wins">${wins || '<span class="none">Pas de bon créneau dans les 5 jours</span>'}</div></div>`;
+      <div class="wins">${wins || `<span class="none">Pas de bon créneau dans les 5 jours${a.why?.length ? ` (${esc(a.why.join(', '))})` : ''}</span>`}</div></div>`;
   }).join('');
 }
 

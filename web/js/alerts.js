@@ -43,7 +43,7 @@ export function buildAlerts(fc, { gustKn = 30, vigilance = [], sessionMin = 75 }
 
   // Bons créneaux de sortie aujourd'hui et demain.
   for (const a of fc.activities || []) {
-    if (a.id === 'balade' || a.id === 'baignade') continue;
+    if (a.id !== 'bateau') continue; // notification seulement pour la sortie bateau
     const w = a.windows.find((x) => x.score >= sessionMin && ['aujourd\'hui', 'demain'].includes(dayWord(x.start, now)) && x.end >= now.slice(0, 13) + ':00');
     if (w) alerts.push({ id: `session-${a.id}-${w.start}`, type: 'session', level: 0, title: `${a.emoji} ${a.label} : bon créneau ${dayWord(w.start, now)}`, text: `${hhmm(w.start)} à ${+w.end.slice(11, 13) + 1}h · ${kn2kmh(w.wind)} km/h ${w.dir} (raf. ${kn2kmh(w.gust)})` });
   }
