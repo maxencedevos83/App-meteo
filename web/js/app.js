@@ -151,6 +151,9 @@ function render(fc) {
   renderHistory(fc);
   renderSources(fc);
   radar.center(fc.latitude, fc.longitude);
+  // Loin de la mer, pas d'onglet vagues.
+  $('#tab-waves').hidden = fc.coastal === false;
+  if (fc.coastal === false && radar.kind === 'waves') radar.tab('rain');
   window.MeteoApp?.ready?.(fc.place, fc.days.length);
 }
 
@@ -395,7 +398,7 @@ function renderLinks(fc) {
   const lat = fc.latitude.toFixed(3), lon = fc.longitude.toFixed(3);
   const spain = fc.timezone === 'Europe/Madrid';
   const groups = [
-    ['🌊 Mer', [
+    fc.coastal !== false && ['🌊 Mer', [
       spain
         ? ['Bulletin maritime AEMET', 'https://www.aemet.es/es/eltiempo/prediccion/maritima']
         : ['Météo marine Météo-France (bulletins côtiers)', 'https://meteofrance.com/meteo-marine'],
@@ -414,7 +417,7 @@ function renderLinks(fc) {
     ]],
   ];
   const note = '<p class="explain">Ensoleillement, évapotranspiration, UV et humidité du sol sont aussi dans le détail de chaque jour (10 jours).</p>';
-  $('#links').innerHTML = groups.map(([title, items]) => `<div class="link-group"><h3 class="sub">${title}</h3>
+  $('#links').innerHTML = groups.filter(Boolean).map(([title, items]) => `<div class="link-group"><h3 class="sub">${title}</h3>
     ${items.filter(Boolean).map(([label, url]) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(label)} ↗</a>`).join('')}</div>`).join('') + note;
 }
 
@@ -465,7 +468,7 @@ function renderModels(fc) {
 
 function renderFlag(fc) {
   const f = beachFlag(fc.hours[0], fc.marine?.[0], fc.shoreFacing);
-  $('#flag').hidden = !f || !fc.marine?.length;
+  $('#flag').hidden = !f || !fc.marine?.length || fc.coastal === false;
   if (!f) return;
   $('#flag').className = `flag f${f.level}`;
   $('#flag').innerHTML = `<i></i><div><b>Drapeau estimé : ${f.color}</b> · ${f.label}${f.why.length ? ` (${esc(f.why.join(', '))})` : ''}

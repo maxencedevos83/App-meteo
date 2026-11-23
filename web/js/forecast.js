@@ -1,6 +1,6 @@
 // Assemble la prévision finale (appli) et le résumé compact (widgets).
 import { combine, daily, codeLabel, codeEmoji, dirLabel, localKey, kmh } from './ensemble.js';
-import { buildActivities } from './activities.js';
+import { buildActivities, hasSeaData } from './activities.js';
 import { skyDay } from './astro.js';
 
 const r1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
@@ -59,6 +59,8 @@ export function buildForecast({ config, sources, ensemblePop = {}, nowcast = nul
   }).sort((a, b) => b.weight - a.weight);
 
   const seaHours = marine ? marine.filter((m) => m.time >= nowKey.slice(0, 13) + ':00').slice(0, 120) : null;
+  // Lieu au bord de la mer : déclaré dans la config (orientation de plage) ou vagues connues à cet endroit.
+  const coastal = config.shoreFacing != null || hasSeaData(seaHours);
 
   return {
     generatedAt: now.toISOString(),
@@ -67,6 +69,7 @@ export function buildForecast({ config, sources, ensemblePop = {}, nowcast = nul
     longitude: config.longitude,
     timezone: config.timezone,
     shoreFacing: config.shoreFacing ?? 180,
+    coastal,
     now: nowKey,
     rain: rainNextHour(nowcast?.minutely, nowKey),
     hours: hours.map((h) => ({
@@ -77,7 +80,7 @@ export function buildForecast({ config, sources, ensemblePop = {}, nowcast = nul
     })),
     days: days.map((d) => ({ ...d, min: r1(d.min), max: r1(d.max), precip: r1(d.precip), pop: r0(d.pop * 100), wind: r0(d.wind), gust: r0(d.gust), dir: r0(d.dir) })),
     marine: seaHours,
-    activities: buildActivities(hours, seaHours, config.shoreFacing ?? 180),
+    activities: buildActivities(hours, seaHours, config.shoreFacing ?? 180, coastal),
     models,
     scores,
     errors,
