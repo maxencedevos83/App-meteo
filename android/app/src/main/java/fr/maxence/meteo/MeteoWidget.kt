@@ -238,14 +238,16 @@ class MeteoWidget : AppWidgetProvider() {
             // En-tête : lieu (📍 = prévision calculée pour l'endroit où l'on est) et heure de mise à jour.
             v.setTextViewText(R.id.place, (if (d.optBoolean("local")) "📍 " else "") + d.optString("place"))
             val stale = MeteoData.lastError(context)?.let { " · hors ligne" } ?: ""
-            v.setTextViewText(R.id.updated, "maj ${d.optString("updated")}$stale")
+            val narrowHeader = widthDp < 250 * scale
+            v.setTextViewText(R.id.updated, (if (narrowHeader) "" else "maj ") + d.optString("updated") + stale)
 
             // Temps actuel.
             v.setTextViewText(R.id.temp, "${int(d, "temp")}°")
             v.setTextViewText(R.id.cond, d.optString("cond"))
             v.setTextViewText(R.id.feels, "Ressenti ${int(d, "feels")}° · ↓${int(d, "min")}° ↑${int(d, "max")}°")
             v.setTextViewText(R.id.wind, windLine(d))
-            v.setTextViewText(R.id.wind_side, windLine(d))
+            // À côté de la température, la flèche suffit pour la direction.
+            v.setTextViewText(R.id.wind_side, "${MeteoData.arrow(num(d, "dirDeg"))} ${MeteoData.kmh(num(d, "wind"))} km/h · raf. ${MeteoData.kmh(num(d, "gust"))}")
             // Widget étroit : le ciel et le ressenti passent sous la température au lieu d'être tronqués à côté.
             val narrow = widthDp < 250 * scale
             v.setViewVisibility(R.id.hero_side, if (narrow) View.GONE else View.VISIBLE)
@@ -296,7 +298,8 @@ class MeteoWidget : AppWidgetProvider() {
 
             // Soleil et lune du jour, calculés ici pour le lieu affiché.
             val sky = Astro.day(System.currentTimeMillis(), d.optDouble("lat", 43.1375), d.optDouble("lon", 6.3683))
-            v.setTextViewText(R.id.sky, "☀ ${Astro.hm(sky.sunrise)} – ${Astro.hm(sky.sunset)}    ${sky.moonEmoji} ${Astro.hm(sky.moonrise)} – ${Astro.hm(sky.moonset)}")
+            val moon = if (widthDp < 250 * scale) "" else "    ${sky.moonEmoji} ${Astro.hm(sky.moonrise)} – ${Astro.hm(sky.moonset)}"
+            v.setTextViewText(R.id.sky, "☀ ${Astro.hm(sky.sunrise)} – ${Astro.hm(sky.sunset)}$moon")
             blocks += Block(listOf(R.id.sky))
 
             val sessions = d.optJSONArray("sessions")
