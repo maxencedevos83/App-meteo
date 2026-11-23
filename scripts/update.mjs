@@ -12,6 +12,8 @@ import { fetchStationObs } from './stations.mjs';
 import { fetchVigilance } from './vigilance.mjs';
 import { fetchMeteocatObs } from './meteocat.mjs';
 import { buildAlerts } from '../web/js/alerts.js';
+import { fetchElevations, ringPoints, fetchMountainHourly, buildMountain, mountainDays, DANGER } from '../web/js/mountain.js';
+import { buildMontagne } from './montagne.mjs';
 
 const root = new URL('..', import.meta.url).pathname;
 const STATE_DIR = process.env.STATE_DIR || join(root, 'state');
@@ -24,6 +26,26 @@ async function readJson(path, fallback) {
 const home = JSON.parse(await readFile(join(root, 'config.json'), 'utf8'));
 const { others = [], ...homeConfig } = home;
 const now = new Date();
+
+// Bulletins de montagne de tous les massifs : un seul relevé par passage, pour tous les lieux.
+const montagne = await buildMontagne({ now, stateDir: STATE_DIR }).catch((e) => ({ json: null, log: [`Bulletins montagne : ${e.message}`] }));
+
+// Lieu montagneux ? Relief autour du lieu, puis isotherme, neige et vent en altitude, et bulletin du massif.
+async function mountainFor({ latitude: lat, longitude: lon, timezone: tz }, nowKey) {
+  const elev = await fetchElevations(ringPoints(lat, lon));
+  const probe = buildMountain({ latitude: lat, longitude: lon, altitude: elev[0], ring: elev.slice(1), bulletins: montagne.json, nowKey });
+  if (!probe) return { mountain: null, altitude: elev[0], relief: Math.round(Math.max(...elev) - Math.min(...elev)) };
+  const hourly = await fetchMountainHourly(lat, lon, tz);
+  return { mountain: { ...probe, hourly }, altitude: elev[0], relief: probe.relief };
+}
+
+function mountainLog(label, res, days) {
+  if (!res.mountain) return console.log(`${label} : pas en montagne (altitude ${Math.round(res.altitude)} m, relief ${res.relief} m)`);
+  const m = res.mountain, b = m.bulletin, d = days?.[0];
+  console.log(`${label} : montagne, ${m.altitude} m (sommets ${m.summit} m), massif ${m.massif ? `${m.massif.name} à ${m.massif.km} km` : 'hors bulletins Météo-France'}`
+    + `${b ? `, risque d'avalanche ${b.danger} (${DANGER[b.danger].label}, ${b.source})` : ', pas de bulletin d\'avalanche en cours'}`
+    + `${d ? ` · aujourd'hui : iso 0 °C ${d.freezing ?? '?'} m, pluie-neige ${d.rainSnow ?? '?'} m, neige ${d.snowfall} cm, au sol ${d.snowDepth ?? '?'} cm, vent 3000 m ${d.wind3000 == null ? '?' : Math.round(d.wind3000 * 1.852)} km/h` : ''}`);
+}
 
 async function run(config, outDir, stateDir) {
   const { latitude: lat, longitude: lon, timezone: tz } = config;
@@ -42,6 +64,8 @@ async function run(config, outDir, stateDir) {
   ]);
   errors.push(...om.errors);
   if (wg) errors.push(...wg.log);
+  const relief = await mountainFor(config, nowKey).catch(soft('Montagne'));
+  const mountain = relief?.mountain || null;
 
   const sources = [...om.sources, ...(wg?.sources || [])];
   if (!sources.length) throw new Error(`${config.place} : aucune source disponible : ${errors.join(' | ')}`);
@@ -70,7 +94,7 @@ async function run(config, outDir, stateDir) {
   const scoreList = sources.map((s) => scoreOf(s.id, s.label));
 
   const fc = buildForecast({
-    config, sources, ensemblePop: ensemblePop || {}, nowcast, marine, skill, errors, now,
+    config, sources, ensemblePop: ensemblePop || {}, nowcast, marine, mountain, skill, errors, now,
     scores: {
       station: config.metar,
       stations: (config.meteocat ? state.mc?.stations : state.mf?.stations) || [],
@@ -112,6 +136,7 @@ async function run(config, outDir, stateDir) {
   console.log(`Vigilance : ${vigilance ? (vigilance.length ? vigilance.map((v) => `${v.color} ${v.type}`).join(', ') : 'aucune') : 'indisponible'}`);
   console.log(`Alertes : ${fc.alerts.map((a) => a.title).join(' | ') || 'aucune'}`);
   for (const a of fc.activities) console.log(`${a.label} : ${a.windows.map((w) => `${w.start.slice(5, 13)}h ×${w.hours} (${w.score})`).join(', ') || '—'}`);
+  if (relief) mountainLog('Montagne', relief, fc.mountain?.days);
   if (errors.length) console.log('Avertissements :\n- ' + errors.join('\n- '));
   return { id: config.id || '', place: config.place, latitude: config.latitude, longitude: config.longitude, timezone: config.timezone };
 }
@@ -124,6 +149,21 @@ for (const o of others) {
     places.push(await run({ ...o, alerts: o.alerts || homeConfig.alerts }, join(OUT_DIR, o.id), join(STATE_DIR, o.id)));
   } catch (e) {
     console.error(`${o.place} : ${e.message}`);
+  }
+}
+console.log('');
+for (const line of montagne.log) console.log(line);
+if (montagne.json) await writeFile(join(OUT_DIR, 'montagne.json'), JSON.stringify(montagne.json));
+
+// Sur une demande de fusion : essai sur trois lieux de montagne, pour vérifier les sources dans le journal.
+if (process.env.GITHUB_EVENT_NAME === 'pull_request') {
+  for (const p of [{ place: 'Chamonix', latitude: 45.9237, longitude: 6.8694 }, { place: 'Barcelonnette', latitude: 44.387, longitude: 6.652 }, { place: 'Valberg', latitude: 44.0965, longitude: 6.9311 }]) {
+    const cfg = { ...p, timezone: 'Europe/Paris' };
+    try {
+      const res = await mountainFor(cfg, localKey(now, cfg.timezone));
+      const days = res.mountain ? mountainDays(res.mountain, [localKey(now, cfg.timezone).slice(0, 10)]) : null;
+      mountainLog(`Essai ${p.place}`, res, days);
+    } catch (e) { console.log(`Essai ${p.place} : ${e.message}`); }
   }
 }
 await writeFile(join(OUT_DIR, 'places.json'), JSON.stringify(places.map((p) => ({ ...p, path: p.id ? `data/${p.id}/` : 'data/' }))));

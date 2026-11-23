@@ -246,6 +246,14 @@ main { max-width: 760px; margin: 0 auto; padding: 0 14px; display: grid; gap: 12
 .sea { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .sea .stat { background: linear-gradient(160deg, rgb(116 192 252 / 22%), rgb(116 192 252 / 6%)); border-color: rgb(116 192 252 / 25%); }
 .sea-days { margin-top: 12px; }
+.aval { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 16px; background: rgb(0 0 0 / 14%); margin-bottom: 10px; font-size: 14px; }
+.aval .lvl { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: #111; font-size: 18px; font-weight: 700; }
+.aval .lvl.l5 { color: #fff; background-image: repeating-linear-gradient(45deg, #000 0 6px, transparent 6px 12px) !important; }
+.aval.none .lvl { background: var(--line); color: var(--muted); }
+.aval small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.mountain .explain { margin: 8px 0; }
+.mtn-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.mtn-stats .stat { background: linear-gradient(160deg, rgb(220 230 255 / 20%), rgb(220 230 255 / 5%)); border-color: rgb(220 230 255 / 25%); }
 
 /* ---------- Alertes ---------- */
 .alerts { display: grid; gap: 8px; margin-top: 2px; }
