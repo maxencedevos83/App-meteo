@@ -205,11 +205,6 @@ class MeteoWidget : AppWidgetProvider() {
             }
             v.setTextViewText(R.id.temp, "${int(d, "temp")}°")
             v.setTextViewText(R.id.wind, windLine(d))
-            // Widget étroit : le ciel et le ressenti passent sous la température au lieu d'être tronqués à côté.
-            val narrow = widthDp < 250 * scale
-            v.setViewVisibility(R.id.hero_side, if (narrow) View.GONE else View.VISIBLE)
-            v.setViewVisibility(R.id.cond_line, if (narrow) View.VISIBLE else View.GONE)
-            v.setTextViewText(R.id.cond_line, "${d.optString("cond")} · ressenti ${int(d, "feels")}°")
             val rain = d.optString("rain")
             val sea = num(d, "sea")?.let { " · mer ${Math.round(it)}°" } ?: ""
             v.setTextViewText(R.id.rain, "💧 ${rain.ifEmpty { "${int(d, "pop")} % de pluie" }}$sea")
