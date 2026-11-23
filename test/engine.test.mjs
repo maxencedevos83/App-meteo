@@ -112,6 +112,13 @@ test('Open-Meteo : un modèle en erreur n\'empêche pas les autres', async () =>
   assert.equal(w.h.length, 6);
   assert.ok(w.d.length >= 2);
   assert.equal(w.d[0].day, 'Auj.');
+  // Lieu quelconque sans données de mer : pas au bord de la mer, pas de bateau ni de baignade.
+  assert.equal(fc.coastal, false);
+  assert.deepEqual(fc.activities.map((a) => a.id), ['balade', 'velo']);
+  // Lieu suivi déclaré sur la côte (orientation de plage) : sorties en mer gardées.
+  const coast = buildForecast({ config: { ...config, shoreFacing: 150 }, sources, now: new Date('2026-10-25T10:00:00Z') });
+  assert.equal(coast.coastal, true);
+  assert.ok(coast.activities.some((a) => a.id === 'bateau'));
 });
 
 test('Windguru : lecture des pas de 3 h et interpolation horaire', () => {

@@ -27,8 +27,8 @@ export function shoreAngle(windFrom, shoreFacing) {
 }
 
 export const ACTIVITIES = [
-  { id: 'bateau', label: 'Sortie bateau', emoji: '🚤' },
-  { id: 'baignade', label: 'Baignade', emoji: '🏊' },
+  { id: 'bateau', label: 'Sortie bateau', emoji: '🚤', sea: true },
+  { id: 'baignade', label: 'Baignade', emoji: '🏊', sea: true },
   { id: 'balade', label: 'Balade à pied', emoji: '🚶' },
   { id: 'velo', label: 'Vélo', emoji: '🚲' },
 ];
@@ -148,14 +148,20 @@ export function bestWindows(hours, scores, { min = 60, minLength = 2, max = 4 } 
     .sort((a, b) => a.start.localeCompare(b.start));
 }
 
-export function buildActivities(hours, marine, shoreFacing = 180) {
+// Le lieu est-il au bord de la mer ? Oui s'il est déclaré comme tel (orientation de plage dans la config)
+// ou si le modèle de vagues y donne des valeurs. Sinon (ville de l'intérieur), ni bateau ni baignade.
+export const hasSeaData = (marine) => !!marine?.some((m) => isNum(m.wave) || isNum(m.sst));
+
+// coastal : null = déduit des données de mer.
+export function buildActivities(hours, marine, shoreFacing = 180, coastal = null) {
+  const atSea = coastal ?? hasSeaData(marine);
   const seaAt = new Map((marine || []).map((m) => [m.time, m]));
   const span = hours.slice(0, 120);
   // Cumul de pluie par jour (sur les heures connues) : 55 mm dans la journée ne laissent pas de vraie fenêtre sèche.
   const dayRain = new Map();
   for (const h of hours) dayRain.set(h.time.slice(0, 10), (dayRain.get(h.time.slice(0, 10)) ?? 0) + (h.precip ?? 0));
   const ctx = span.map((h, i) => hourContext(hours, i, dayRain.get(h.time.slice(0, 10))));
-  return ACTIVITIES.map((a) => {
+  return ACTIVITIES.filter((a) => atSea || !a.sea).map((a) => {
     const rows = span.map((h, i) => scoreHour(a.id, h, seaAt.get(h.time), shoreFacing, ctx[i]));
     const scores = rows.map((r) => r.score);
     const windows = bestWindows(span, scores).map((w) => {

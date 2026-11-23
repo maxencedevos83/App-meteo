@@ -80,12 +80,21 @@ export async function fetchNowcast(lat, lon, timeZone, fetchImpl) {
 }
 
 // État de la mer (vagues, température de l'eau).
+// Au-delà de cette distance entre le lieu et la maille du modèle de vagues, le lieu n'est pas au bord de la mer.
+export const SEA_CELL_MAX_KM = 25;
+
 export async function fetchMarine(lat, lon, timeZone, fetchImpl) {
   const url = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&timezone=${encodeURIComponent(timeZone)}`
     + '&hourly=wave_height,wave_direction,wave_period,swell_wave_height,swell_wave_direction,swell_wave_period,wind_wave_height,sea_surface_temperature&forecast_days=6';
   const json = await getJson(url, fetchImpl);
   const h = json.hourly || {};
   if (!h.time) return null;
+  // Loin de la mer, le modèle de vagues n'a rien (valeurs vides) ou se rabat sur une maille marine lointaine :
+  // dans les deux cas, pas d'état de la mer pour ce lieu.
+  const hasSea = [h.wave_height, h.sea_surface_temperature].some((a) => a?.some((v) => typeof v === 'number'));
+  if (!hasSea) return null;
+  if (typeof json.latitude === 'number' && typeof json.longitude === 'number'
+    && distanceKm({ latitude: lat, longitude: lon }, json) > SEA_CELL_MAX_KM) return null;
   return h.time.map((t, i) => ({
     time: t, wave: h.wave_height?.[i], waveDir: h.wave_direction?.[i], period: h.wave_period?.[i],
     swell: h.swell_wave_height?.[i], swellDir: h.swell_wave_direction?.[i], swellPeriod: h.swell_wave_period?.[i],
