@@ -161,7 +161,8 @@ export function buildWidget(fc) {
     // 48 prochaines heures : le widget s'en sert pour se recaler sur l'heure actuelle et pour les alertes.
     chart: fc.hours.slice(0, 48).map((h) => ({ t: h.time, h: +h.time.slice(11, 13), code: h.code, isDay: h.isDay, temp: r1(h.temp), feels: r1(h.feels), wind: h.wind, gust: h.gust, dir: h.dir, pop: h.pop ?? 0, precip: h.precip ?? 0 })),
     alerts: fc.alerts || [],
-    sessions: (fc.activities || []).filter((a) => a.windows.length).map((a) => {
+    // Le vélo reste dans l'appli : le widget n'affiche que les créneaux qu'il connaît.
+    sessions: (fc.activities || []).filter((a) => a.windows.length && a.id !== 'velo').map((a) => {
       const w = a.windows.find((x) => x.end >= fc.now.slice(0, 13) + ':00') || a.windows[0];
       return { id: a.id, emoji: a.emoji, label: a.label, when: whenLabel(w), score: w.score, wind: w.wind, gust: w.gust, dir: w.dir };
     }),
