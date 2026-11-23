@@ -128,15 +128,21 @@ export async function fetchMountainHourly(lat, lon, timeZone, fetchImpl) {
 
 // Risques d'avalanche du jour, au format EAWS : « FR-03 » → maximum du massif, « FR-03:high » / « FR-03:low » → au-dessus /
 // en dessous de l'altitude limite, suffixes « :am » / « :pm » quand le risque change dans la journée.
-// Valeurs : low, moderate, considerable, high, very_high (no_snow, no_rating… : pas de niveau).
+// Valeurs : niveau 1 à 5 (format actuel du fichier), ou low, moderate, considerable, high, very_high
+// (no_snow, no_rating, 0… : pas de niveau).
 const EAWS_LEVEL = { low: 1, moderate: 2, considerable: 3, high: 4, very_high: 5 };
+const eawsLevel = (v) => {
+  const n = Number(v);
+  if (Number.isInteger(n) && n >= 1 && n <= 5) return n;
+  return EAWS_LEVEL[String(v ?? '').toLowerCase()] ?? 0;
+};
 export function parseEawsRatings(json) {
   const ratings = json?.maxDangerRatings || json || {};
   const out = new Map();
   for (const m of MASSIFS) {
     const key = `FR-${String(m.id).padStart(2, '0')}`;
     const keys = Object.keys(ratings).filter((k) => k === key || k.startsWith(`${key}:`));
-    const level = (filter) => Math.max(0, ...keys.filter(filter).map((k) => EAWS_LEVEL[String(ratings[k] || '').toLowerCase()] ?? 0)) || null;
+    const level = (filter) => Math.max(0, ...keys.filter(filter).map((k) => eawsLevel(ratings[k]))) || null;
     const danger = level(() => true);
     if (danger) out.set(m.id, { danger, high: level((k) => k.includes(':high')), low: level((k) => k.includes(':low')) });
   }

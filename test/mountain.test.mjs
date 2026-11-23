@@ -105,3 +105,9 @@ test('EAWS : risque du matin et de l\'après-midi, hors saison ignoré', () => {
   assert.equal(m.has(1), false);
   assert.deepEqual(m.get(2), { danger: 3, high: 3, low: 1 });
 });
+
+test('EAWS : niveaux numériques (format actuel du fichier)', () => {
+  const m = parseEawsRatings({ maxDangerRatings: { 'FR-01': 3, 'FR-01:am': 3, 'FR-01:high': 3, 'FR-01:high:am': 3, 'FR-01:high:pm': 3, 'FR-01:low': 2, 'FR-21': 0 } });
+  assert.deepEqual(m.get(1), { danger: 3, high: 3, low: 2 });
+  assert.equal(m.has(21), false);
+});
