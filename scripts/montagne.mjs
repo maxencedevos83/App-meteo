@@ -30,7 +30,9 @@ export async function fetchEawsRatings(now = new Date(), fetchImpl = fetch) {
     const json = await res.json();
     const ratings = json?.maxDangerRatings || json || {};
     const keys = Object.keys(ratings);
-    return { date, massifs: parseEawsRatings(json), keys: keys.length, france: keys.filter((k) => k.startsWith('FR')).length, sample: (keys.some((k) => k.startsWith('FR')) ? keys.filter((k) => k.startsWith('FR')) : keys).slice(0, 6) };
+    return { date, massifs: parseEawsRatings(json), keys: keys.length, france: keys.filter((k) => k.startsWith('FR')).length, sample: (keys.some((k) => k.startsWith('FR')) ? keys.filter((k) => k.startsWith('FR')) : keys).slice(0, 6).map((k) => `${k}=${ratings[k]}`),
+      // Valeurs rencontrées pour les massifs français (hors saison : no_snow, no_rating…).
+      values: [...new Set(keys.filter((k) => k.startsWith('FR')).map((k) => String(ratings[k])))].slice(0, 8) };
   }
   throw new Error(`EAWS : aucun fichier (${tried.join(', ')})`);
 }
@@ -111,7 +113,7 @@ async function fetchAllBra(key, fetchImpl) {
 export async function buildMontagne({ now = new Date(), stateDir, key = process.env.METEOFRANCE_API_KEY, fetchImpl = fetch } = {}) {
   const log = [];
   const eaws = await fetchEawsRatings(now, fetchImpl).catch((e) => { log.push(e.message); return null; });
-  if (eaws) log.push(`EAWS ${eaws.date} : ${eaws.keys} régions dont ${eaws.france} françaises, ${eaws.massifs.size} massifs reconnus (ex. ${eaws.sample.join(', ')})`);
+  if (eaws) log.push(`EAWS ${eaws.date} : ${eaws.keys} régions dont ${eaws.france} françaises, ${eaws.massifs.size} massifs reconnus (ex. ${eaws.sample.join(', ')} ; valeurs françaises : ${eaws.values.join(', ') || 'aucune'})`);
 
   let bra = null;
   if (key) {

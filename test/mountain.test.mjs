@@ -99,3 +99,9 @@ test('alertes montagne et bulletin trop ancien ignoré', () => {
   assert.equal(massifBulletin(bulletins, { id: 3 }, '2026-12-02T09:00').danger, 3);
   assert.equal(buildMountain({ latitude: 43.1375, longitude: 6.3683, altitude: 10, ring: [5, 400] }), null);
 });
+
+test('EAWS : risque du matin et de l\'après-midi, hors saison ignoré', () => {
+  const m = parseEawsRatings({ maxDangerRatings: { 'FR-01': 'no_rating', 'FR-01:high:am': 'no_rating', 'FR-02:high:am': 'moderate', 'FR-02:high:pm': 'considerable', 'FR-02:low:pm': 'low' } });
+  assert.equal(m.has(1), false);
+  assert.deepEqual(m.get(2), { danger: 3, high: 3, low: 1 });
+});
