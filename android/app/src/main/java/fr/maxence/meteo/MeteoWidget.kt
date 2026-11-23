@@ -17,6 +17,7 @@ import android.os.Looper
 import android.provider.AlarmClock
 import android.text.SpannableStringBuilder
 import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
 import android.util.Log
 import android.util.SizeF
@@ -204,6 +205,11 @@ class MeteoWidget : AppWidgetProvider() {
             }
             v.setTextViewText(R.id.temp, "${int(d, "temp")}°")
             v.setTextViewText(R.id.wind, windLine(d))
+            // Widget étroit : le ciel et le ressenti passent sous la température au lieu d'être tronqués à côté.
+            val narrow = widthDp < 250 * scale
+            v.setViewVisibility(R.id.hero_side, if (narrow) View.GONE else View.VISIBLE)
+            v.setViewVisibility(R.id.cond_line, if (narrow) View.VISIBLE else View.GONE)
+            v.setTextViewText(R.id.cond_line, "${d.optString("cond")} · ressenti ${int(d, "feels")}°")
             val rain = d.optString("rain")
             val sea = num(d, "sea")?.let { " · mer ${Math.round(it)}°" } ?: ""
             v.setTextViewText(R.id.rain, "💧 ${rain.ifEmpty { "${int(d, "pop")} % de pluie" }}$sea")
@@ -215,17 +221,21 @@ class MeteoWidget : AppWidgetProvider() {
             val scale = style.textScale.coerceIn(50, 200) / 100f
             val blocks = mutableListOf<Block>()
 
-            // Horloge : grande (bloc facultatif, en tête), petite dans l'en-tête, ou masquée.
+            // Horloge : grande (bloc facultatif, remplacée par la petite de l'en-tête si elle ne tient pas),
+            // petite dans l'en-tête, ou masquée.
             v.setViewVisibility(R.id.date, if (style.showDate) View.VISIBLE else View.GONE)
-            v.setViewVisibility(R.id.clock_small, if (style.clock == WidgetStyle.CLOCK_SMALL) View.VISIBLE else View.GONE)
+            v.setViewVisibility(R.id.clock_small, if (style.clock == WidgetStyle.CLOCK_HIDDEN) View.GONE else View.VISIBLE)
             v.setOnClickPendingIntent(R.id.clock_row, PendingIntent.getActivity(context, 3, Intent(AlarmClock.ACTION_SHOW_ALARMS), PendingIntent.FLAG_IMMUTABLE))
-            if (style.clock == WidgetStyle.CLOCK_BIG) blocks += Block(listOf(R.id.clock_row)) else v.setViewVisibility(R.id.clock_row, View.GONE)
+            v.setViewVisibility(R.id.clock_row, View.GONE)
+            val clock = if (style.clock == WidgetStyle.CLOCK_BIG) Block(listOf(R.id.clock_row), hide = listOf(R.id.clock_small)) else null
 
             for (id in listOf(R.id.alert, R.id.tiles, R.id.strip_a, R.id.strip_b, R.id.sky, R.id.sessions)) v.setViewVisibility(id, View.GONE)
             if (d == null) {
                 v.setTextViewText(R.id.cond, "Pas encore de données")
                 v.setTextViewText(R.id.feels, MeteoData.lastError(context) ?: "Touchez ⟳ pour actualiser")
                 v.setViewVisibility(R.id.wind, View.GONE)
+                v.setViewVisibility(R.id.cond_line, View.GONE)
+                clock?.let { blocks += it }
                 return v to blocks
             }
 
@@ -240,6 +250,11 @@ class MeteoWidget : AppWidgetProvider() {
             v.setTextViewText(R.id.feels, "Ressenti ${int(d, "feels")}°")
             v.setTextViewText(R.id.minmax, "↓${int(d, "min")}°  ↑${int(d, "max")}°")
             v.setTextViewText(R.id.wind, windLine(d))
+            // Widget étroit : le ciel et le ressenti passent sous la température au lieu d'être tronqués à côté.
+            val narrow = widthDp < 250 * scale
+            v.setViewVisibility(R.id.hero_side, if (narrow) View.GONE else View.VISIBLE)
+            v.setViewVisibility(R.id.cond_line, if (narrow) View.VISIBLE else View.GONE)
+            v.setTextViewText(R.id.cond_line, "${d.optString("cond")} · ressenti ${int(d, "feels")}°")
 
             // Alerte la plus importante (vigilance, orage, coup de vent, pluie), teintée selon son niveau.
             val alerts = d.optJSONArray("alerts")
@@ -274,9 +289,11 @@ class MeteoWidget : AppWidgetProvider() {
             val hourList = (0 until (hours?.length() ?: 0)).mapNotNull { hours?.optJSONObject(it) }
             val dayList = (dayStart until (days?.length() ?: 0)).mapNotNull { days?.optJSONObject(it) }
             val (first, second) = if (style.daily) (dayList to true) to (hourList to false) else (hourList to false) to (dayList to true)
-            if (fillStrip(context, v, "a", first.first, first.second, cols, icons)) blocks += Block(listOf(R.id.strip_a))
+            // Ordre d'importance : alerte, prévision principale, grande horloge, cases, seconde prévision, soleil, sorties.
+            if (fillStrip(context, v, "a", first.first, first.second, cols, icons, style)) blocks += Block(listOf(R.id.strip_a))
+            clock?.let { blocks += it }
             blocks += Block(listOf(R.id.tiles), hide = listOf(R.id.wind))
-            if (fillStrip(context, v, "b", second.first, second.second, cols, icons)) blocks += Block(listOf(R.id.strip_b))
+            if (fillStrip(context, v, "b", second.first, second.second, cols, icons, style)) blocks += Block(listOf(R.id.strip_b))
 
             // Soleil et lune du jour, calculés ici pour le lieu affiché.
             val sky = Astro.day(System.currentTimeMillis(), d.optDouble("lat", 43.1375), d.optDouble("lon", 6.3683))
@@ -307,12 +324,12 @@ class MeteoWidget : AppWidgetProvider() {
 
             val pop = num(d, "pop") ?: 0.0
             v.setTextViewText(R.id.tile_rain_value, SpannableStringBuilder("${Math.round(pop)}").append(small(" %")))
-            v.setTextViewText(R.id.tile_rain_sub, d.optString("rain").ifEmpty { if (pop < 30) "pas de pluie prévue" else "risque cette heure" })
+            v.setTextViewText(R.id.tile_rain_sub, d.optString("rain").ifEmpty { if (pop < 30) "temps sec" else "risque cette heure" })
 
             val sea = num(d, "sea")
             if (sea != null) {
                 v.setTextViewText(R.id.tile_sea_value, "${Math.round(sea)}°")
-                v.setTextViewText(R.id.tile_sea_sub, num(d, "wave")?.let { "vagues ${String.format(java.util.Locale.FRANCE, "%.1f", it)} m" } ?: "eau")
+                v.setTextViewText(R.id.tile_sea_sub, num(d, "wave")?.let { "houle ${String.format(java.util.Locale.FRANCE, "%.1f", it)} m" } ?: "eau")
             }
             v.setTextViewText(R.id.tile_conf_value, SpannableStringBuilder(int(d, "confidence")).append(small(" %")))
             v.setTextViewText(R.id.tile_conf_sub, "${int(d, "sources")} modèles")
@@ -324,7 +341,7 @@ class MeteoWidget : AppWidgetProvider() {
         }
 
         /** Remplit une ligne de prévision (colonnes [prefix]0 à 5) ; false si elle est vide. */
-        private fun fillStrip(context: Context, v: RemoteViews, prefix: String, items: List<JSONObject>, daily: Boolean, cols: Int, icons: Icons): Boolean {
+        private fun fillStrip(context: Context, v: RemoteViews, prefix: String, items: List<JSONObject>, daily: Boolean, cols: Int, icons: Icons, style: WidgetStyle.Style): Boolean {
             if (items.isEmpty()) return false
             val res = context.resources
             fun id(name: String) = res.getIdentifier("$prefix$name", "id", context.packageName)
@@ -344,15 +361,17 @@ class MeteoWidget : AppWidgetProvider() {
                 if (daily) {
                     v.setTextViewText(id("${i}_t"), item.optString("day"))
                     v.setImageViewBitmap(id("${i}_icon"), icons.get(item.optInt("code", 3), true, false, iconPx, 0))
-                    v.setTextViewText(id("${i}_temp"), "${int(item, "max")}°")
-                    v.setTextViewText(id("${i}_min"), "${int(item, "min")}°")
-                    v.setViewVisibility(id("${i}_min"), View.VISIBLE)
+                    // Maxi, puis mini plus discret sur la même ligne.
+                    val min = SpannableStringBuilder(" ${int(item, "min")}°").apply {
+                        setSpan(RelativeSizeSpan(0.86f), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        setSpan(ForegroundColorSpan((style.textColor and 0xFFFFFF) or (0xA6 shl 24)), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    }
+                    v.setTextViewText(id("${i}_temp"), SpannableStringBuilder("${int(item, "max")}°").append(min))
                     v.setTextViewText(id("${i}_wind"), "${MeteoData.kmh(wind)}·${MeteoData.kmh(num(item, "gust"))}")
                 } else {
                     v.setTextViewText(id("${i}_t"), item.optString("t"))
                     v.setImageViewBitmap(id("${i}_icon"), icons.get(item.optInt("code", 3), item.optBoolean("isDay", true), false, iconPx, 0))
                     v.setTextViewText(id("${i}_temp"), "${int(item, "temp")}°")
-                    v.setViewVisibility(id("${i}_min"), View.GONE)
                     v.setTextViewText(id("${i}_wind"), "${MeteoData.arrow(num(item, "dirDeg"))}${MeteoData.kmh(wind)}")
                 }
                 v.setViewVisibility(id("${i}_pop"), if (anyPop) View.VISIBLE else View.GONE)
