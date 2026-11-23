@@ -230,6 +230,7 @@ class MeteoWidget : AppWidgetProvider() {
                 v.setTextViewText(R.id.feels, MeteoData.lastError(context) ?: "Touchez ⟳ pour actualiser")
                 v.setViewVisibility(R.id.wind, View.GONE)
                 v.setViewVisibility(R.id.cond_line, View.GONE)
+                v.setViewVisibility(R.id.wind_side, View.GONE)
                 clock?.let { blocks += it }
                 return v to blocks
             }
@@ -242,14 +243,17 @@ class MeteoWidget : AppWidgetProvider() {
             // Temps actuel.
             v.setTextViewText(R.id.temp, "${int(d, "temp")}°")
             v.setTextViewText(R.id.cond, d.optString("cond"))
-            v.setTextViewText(R.id.feels, "Ressenti ${int(d, "feels")}°")
-            v.setTextViewText(R.id.minmax, "↓${int(d, "min")}°  ↑${int(d, "max")}°")
+            v.setTextViewText(R.id.feels, "Ressenti ${int(d, "feels")}° · ↓${int(d, "min")}° ↑${int(d, "max")}°")
             v.setTextViewText(R.id.wind, windLine(d))
+            v.setTextViewText(R.id.wind_side, windLine(d))
             // Widget étroit : le ciel et le ressenti passent sous la température au lieu d'être tronqués à côté.
             val narrow = widthDp < 250 * scale
             v.setViewVisibility(R.id.hero_side, if (narrow) View.GONE else View.VISIBLE)
             v.setViewVisibility(R.id.cond_line, if (narrow) View.VISIBLE else View.GONE)
             v.setTextViewText(R.id.cond_line, "${d.optString("cond")} · ressenti ${int(d, "feels")}°")
+            // Le vent se met à côté de la température (ou dessous si le widget est étroit) quand les cases sautent.
+            val windAlone = if (narrow) R.id.wind else R.id.wind_side
+            v.setViewVisibility(if (narrow) R.id.wind_side else R.id.wind, View.GONE)
 
             // Alerte la plus importante (vigilance, orage, coup de vent, pluie), teintée selon son niveau.
             val alerts = d.optJSONArray("alerts")
@@ -287,7 +291,7 @@ class MeteoWidget : AppWidgetProvider() {
             // Ordre d'importance : alerte, prévision principale, grande horloge, cases, seconde prévision, soleil, sorties.
             if (fillStrip(context, v, "a", first.first, first.second, cols, icons, style)) blocks += Block(listOf(R.id.strip_a))
             clock?.let { blocks += it }
-            blocks += Block(listOf(R.id.tiles), hide = listOf(R.id.wind))
+            blocks += Block(listOf(R.id.tiles), hide = listOf(windAlone))
             if (fillStrip(context, v, "b", second.first, second.second, cols, icons, style)) blocks += Block(listOf(R.id.strip_b))
 
             // Soleil et lune du jour, calculés ici pour le lieu affiché.
@@ -319,7 +323,8 @@ class MeteoWidget : AppWidgetProvider() {
 
             val pop = num(d, "pop") ?: 0.0
             v.setTextViewText(R.id.tile_rain_value, SpannableStringBuilder("${Math.round(pop)}").append(small(" %")))
-            v.setTextViewText(R.id.tile_rain_sub, d.optString("rain").ifEmpty { if (pop < 30) "temps sec" else "risque cette heure" })
+            val rainText = d.optString("rain").takeUnless { it.isEmpty() || it.startsWith("Pas de pluie") }
+            v.setTextViewText(R.id.tile_rain_sub, rainText ?: if (pop < 30) "temps sec" else "risque cette heure")
 
             val sea = num(d, "sea")
             if (sea != null) {

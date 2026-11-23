@@ -108,14 +108,15 @@
                 android:orientation="vertical">
                 <TextView android:id="@+id/cond" style="@style/WBold" android:textSize="15sp" android:text="Chargement…" />
                 <TextView android:id="@+id/feels" style="@style/WMuted" android:text="" />
-                <TextView android:id="@+id/minmax" style="@style/WMuted" android:text="" />
+                <!-- Vent à côté de la température quand les cases ne tiennent pas. -->
+                <TextView android:id="@+id/wind_side" style="@style/WBold" android:layout_marginTop="2dp" android:text="" />
             </LinearLayout>
         </LinearLayout>
 
         <!-- Widget étroit : ciel et ressenti sur une ligne, sous la température. -->
         <TextView android:id="@+id/cond_line" style="@style/WText" android:layout_width="match_parent" android:visibility="gone" android:text="" />
 
-        <!-- Vent, affiché ici seulement quand les cases ne tiennent pas. -->
+        <!-- Vent sous la température (widget étroit), quand les cases ne tiennent pas. -->
         <TextView android:id="@+id/wind" style="@style/WBold" android:layout_width="match_parent" android:layout_marginTop="2dp" android:text="" />
 
         <!-- Alerte la plus importante, teintée selon le niveau. -->
@@ -168,51 +169,51 @@
             android:visibility="gone"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="6dp"
             android:background="@drawable/glass_bg"
             android:orientation="horizontal"
             android:paddingStart="4dp"
-            android:paddingTop="6dp"
+            android:paddingTop="4dp"
             android:paddingEnd="4dp"
-            android:paddingBottom="7dp">
+            android:paddingBottom="5dp">
             <LinearLayout android:id="@+id/a0" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center_horizontal" android:orientation="vertical">
                 <TextView android:id="@+id/a0_t" style="@style/WColT" android:text="" />
-                <ImageView android:id="@+id/a0_icon" android:layout_width="28dp" android:layout_height="28dp" android:layout_marginTop="2dp" android:contentDescription="@null" />
+                <ImageView android:id="@+id/a0_icon" android:layout_width="26dp" android:layout_height="26dp" android:layout_marginTop="1dp" android:contentDescription="@null" />
                 <TextView android:id="@+id/a0_temp" style="@style/WColTemp" android:text="" />
                 <TextView android:id="@+id/a0_pop" style="@style/WPop" android:text="" />
                 <TextView android:id="@+id/a0_wind" style="@style/WWind" android:text="" />
             </LinearLayout>
             <LinearLayout android:id="@+id/a1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center_horizontal" android:orientation="vertical">
                 <TextView android:id="@+id/a1_t" style="@style/WColT" android:text="" />
-                <ImageView android:id="@+id/a1_icon" android:layout_width="28dp" android:layout_height="28dp" android:layout_marginTop="2dp" android:contentDescription="@null" />
+                <ImageView android:id="@+id/a1_icon" android:layout_width="26dp" android:layout_height="26dp" android:layout_marginTop="1dp" android:contentDescription="@null" />
                 <TextView android:id="@+id/a1_temp" style="@style/WColTemp" android:text="" />
                 <TextView android:id="@+id/a1_pop" style="@style/WPop" android:text="" />
                 <TextView android:id="@+id/a1_wind" style="@style/WWind" android:text="" />
             </LinearLayout>
             <LinearLayout android:id="@+id/a2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center_horizontal" android:orientation="vertical">
                 <TextView android:id="@+id/a2_t" style="@style/WColT" android:text="" />
-                <ImageView android:id="@+id/a2_icon" android:layout_width="28dp" android:layout_height="28dp" android:layout_marginTop="2dp" android:contentDescription="@null" />
+                <ImageView android:id="@+id/a2_icon" android:layout_width="26dp" android:layout_height="26dp" android:layout_marginTop="1dp" android:contentDescription="@null" />
                 <TextView android:id="@+id/a2_temp" style="@style/WColTemp" android:text="" />
                 <TextView android:id="@+id/a2_pop" style="@style/WPop" android:text="" />
                 <TextView android:id="@+id/a2_wind" style="@style/WWind" android:text="" />
             </LinearLayout>
             <LinearLayout android:id="@+id/a3" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center_horizontal" android:orientation="vertical">
                 <TextView android:id="@+id/a3_t" style="@style/WColT" android:text="" />
-                <ImageView android:id="@+id/a3_icon" android:layout_width="28dp" android:layout_height="28dp" android:layout_marginTop="2dp" android:contentDescription="@null" />
+                <ImageView android:id="@+id/a3_icon" android:layout_width="26dp" android:layout_height="26dp" android:layout_marginTop="1dp" android:contentDescription="@null" />
                 <TextView android:id="@+id/a3_temp" style="@style/WColTemp" android:text="" />
                 <TextView android:id="@+id/a3_pop" style="@style/WPop" android:text="" />
                 <TextView android:id="@+id/a3_wind" style="@style/WWind" android:text="" />
             </LinearLayout>
             <LinearLayout android:id="@+id/a4" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center_horizontal" android:orientation="vertical">
                 <TextView android:id="@+id/a4_t" style="@style/WColT" android:text="" />
-                <ImageView android:id="@+id/a4_icon" android:layout_width="28dp" android:layout_height="28dp" android:layout_marginTop="2dp" android:contentDescription="@null" />
+                <ImageView android:id="@+id/a4_icon" android:layout_width="26dp" android:layout_height="26dp" android:layout_marginTop="1dp" android:contentDescription="@null" />
                 <TextView android:id="@+id/a4_temp" style="@style/WColTemp" android:text="" />
                 <TextView android:id="@+id/a4_pop" style="@style/WPop" android:text="" />
                 <TextView android:id="@+id/a4_wind" style="@style/WWind" android:text="" />
             </LinearLayout>
             <LinearLayout android:id="@+id/a5" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center_horizontal" android:orientation="vertical">
                 <TextView android:id="@+id/a5_t" style="@style/WColT" android:text="" />
-                <ImageView android:id="@+id/a5_icon" android:layout_width="28dp" android:layout_height="28dp" android:layout_marginTop="2dp" android:contentDescription="@null" />
+                <ImageView android:id="@+id/a5_icon" android:layout_width="26dp" android:layout_height="26dp" android:layout_marginTop="1dp" android:contentDescription="@null" />
                 <TextView android:id="@+id/a5_temp" style="@style/WColTemp" android:text="" />
                 <TextView android:id="@+id/a5_pop" style="@style/WPop" android:text="" />
                 <TextView android:id="@+id/a5_wind" style="@style/WWind" android:text="" />
@@ -225,51 +226,51 @@
             android:visibility="gone"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="6dp"
             android:background="@drawable/glass_bg"
             android:orientation="horizontal"
             android:paddingStart="4dp"
-            android:paddingTop="6dp"
+            android:paddingTop="4dp"
             android:paddingEnd="4dp"
-            android:paddingBottom="7dp">
+            android:paddingBottom="5dp">
             <LinearLayout android:id="@+id/b0" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center_horizontal" android:orientation="vertical">
                 <TextView android:id="@+id/b0_t" style="@style/WColT" android:text="" />
-                <ImageView android:id="@+id/b0_icon" android:layout_width="28dp" android:layout_height="28dp" android:layout_marginTop="2dp" android:contentDescription="@null" />
+                <ImageView android:id="@+id/b0_icon" android:layout_width="26dp" android:layout_height="26dp" android:layout_marginTop="1dp" android:contentDescription="@null" />
                 <TextView android:id="@+id/b0_temp" style="@style/WColTemp" android:text="" />
                 <TextView android:id="@+id/b0_pop" style="@style/WPop" android:text="" />
                 <TextView android:id="@+id/b0_wind" style="@style/WWind" android:text="" />
             </LinearLayout>
             <LinearLayout android:id="@+id/b1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center_horizontal" android:orientation="vertical">
                 <TextView android:id="@+id/b1_t" style="@style/WColT" android:text="" />
-                <ImageView android:id="@+id/b1_icon" android:layout_width="28dp" android:layout_height="28dp" android:layout_marginTop="2dp" android:contentDescription="@null" />
+                <ImageView android:id="@+id/b1_icon" android:layout_width="26dp" android:layout_height="26dp" android:layout_marginTop="1dp" android:contentDescription="@null" />
                 <TextView android:id="@+id/b1_temp" style="@style/WColTemp" android:text="" />
                 <TextView android:id="@+id/b1_pop" style="@style/WPop" android:text="" />
                 <TextView android:id="@+id/b1_wind" style="@style/WWind" android:text="" />
             </LinearLayout>
             <LinearLayout android:id="@+id/b2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center_horizontal" android:orientation="vertical">
                 <TextView android:id="@+id/b2_t" style="@style/WColT" android:text="" />
-                <ImageView android:id="@+id/b2_icon" android:layout_width="28dp" android:layout_height="28dp" android:layout_marginTop="2dp" android:contentDescription="@null" />
+                <ImageView android:id="@+id/b2_icon" android:layout_width="26dp" android:layout_height="26dp" android:layout_marginTop="1dp" android:contentDescription="@null" />
                 <TextView android:id="@+id/b2_temp" style="@style/WColTemp" android:text="" />
                 <TextView android:id="@+id/b2_pop" style="@style/WPop" android:text="" />
                 <TextView android:id="@+id/b2_wind" style="@style/WWind" android:text="" />
             </LinearLayout>
             <LinearLayout android:id="@+id/b3" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center_horizontal" android:orientation="vertical">
                 <TextView android:id="@+id/b3_t" style="@style/WColT" android:text="" />
-                <ImageView android:id="@+id/b3_icon" android:layout_width="28dp" android:layout_height="28dp" android:layout_marginTop="2dp" android:contentDescription="@null" />
+                <ImageView android:id="@+id/b3_icon" android:layout_width="26dp" android:layout_height="26dp" android:layout_marginTop="1dp" android:contentDescription="@null" />
                 <TextView android:id="@+id/b3_temp" style="@style/WColTemp" android:text="" />
                 <TextView android:id="@+id/b3_pop" style="@style/WPop" android:text="" />
                 <TextView android:id="@+id/b3_wind" style="@style/WWind" android:text="" />
             </LinearLayout>
             <LinearLayout android:id="@+id/b4" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center_horizontal" android:orientation="vertical">
                 <TextView android:id="@+id/b4_t" style="@style/WColT" android:text="" />
-                <ImageView android:id="@+id/b4_icon" android:layout_width="28dp" android:layout_height="28dp" android:layout_marginTop="2dp" android:contentDescription="@null" />
+                <ImageView android:id="@+id/b4_icon" android:layout_width="26dp" android:layout_height="26dp" android:layout_marginTop="1dp" android:contentDescription="@null" />
                 <TextView android:id="@+id/b4_temp" style="@style/WColTemp" android:text="" />
                 <TextView android:id="@+id/b4_pop" style="@style/WPop" android:text="" />
                 <TextView android:id="@+id/b4_wind" style="@style/WWind" android:text="" />
             </LinearLayout>
             <LinearLayout android:id="@+id/b5" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center_horizontal" android:orientation="vertical">
                 <TextView android:id="@+id/b5_t" style="@style/WColT" android:text="" />
-                <ImageView android:id="@+id/b5_icon" android:layout_width="28dp" android:layout_height="28dp" android:layout_marginTop="2dp" android:contentDescription="@null" />
+                <ImageView android:id="@+id/b5_icon" android:layout_width="26dp" android:layout_height="26dp" android:layout_marginTop="1dp" android:contentDescription="@null" />
                 <TextView android:id="@+id/b5_temp" style="@style/WColTemp" android:text="" />
                 <TextView android:id="@+id/b5_pop" style="@style/WPop" android:text="" />
                 <TextView android:id="@+id/b5_wind" style="@style/WWind" android:text="" />

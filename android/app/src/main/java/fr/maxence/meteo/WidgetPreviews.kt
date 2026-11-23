@@ -69,7 +69,7 @@ object WidgetPreviews {
             // Ce qui est affiché, et la hauteur du contenu par rapport à la place (jamais plus grande).
             val content = view.findViewById<View>(R.id.content)
             content.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
-            val shown = listOf("clock_row", "header", "hero", "wind", "alert", "tiles", "strip_a", "strip_b", "sky", "sessions").filter { name ->
+            val shown = listOf("clock_row", "header", "hero", "cond_line", "wind", "wind_side", "alert", "tiles", "strip_a", "strip_b", "sky", "sessions").filter { name ->
                 val id = activity.resources.getIdentifier(name, "id", activity.packageName)
                 id != 0 && view.findViewById<View>(id)?.visibility == View.VISIBLE
             }
