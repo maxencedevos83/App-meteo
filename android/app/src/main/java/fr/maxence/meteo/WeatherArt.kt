@@ -217,38 +217,4 @@ object WeatherArt {
             c.drawPath(path, paint)
         }
     }
-
-    // --- Fond selon le ciel ---
-
-    private fun sky(kind: Kind, isDay: Boolean): IntArray = when (kind) {
-        Kind.CLEAR -> if (isDay) intArrayOf(Color.rgb(36, 120, 220), Color.rgb(90, 190, 245)) else intArrayOf(Color.rgb(10, 16, 40), Color.rgb(40, 56, 104))
-        Kind.PARTLY -> if (isDay) intArrayOf(Color.rgb(52, 112, 196), Color.rgb(120, 176, 226)) else intArrayOf(Color.rgb(20, 30, 48), Color.rgb(44, 64, 92))
-        Kind.CLOUDY, Kind.FOG -> if (isDay) intArrayOf(Color.rgb(84, 102, 122), Color.rgb(138, 154, 172)) else intArrayOf(Color.rgb(36, 46, 60), Color.rgb(66, 78, 94))
-        Kind.DRIZZLE, Kind.RAIN -> if (isDay) intArrayOf(Color.rgb(48, 66, 84), Color.rgb(88, 112, 130)) else intArrayOf(Color.rgb(22, 30, 42), Color.rgb(48, 60, 76))
-        Kind.SNOW -> if (isDay) intArrayOf(Color.rgb(98, 124, 170), Color.rgb(176, 194, 222)) else intArrayOf(Color.rgb(40, 50, 80), Color.rgb(84, 98, 130))
-        Kind.STORM -> intArrayOf(Color.rgb(34, 22, 54), Color.rgb(74, 58, 104))
-    }
-
-    /** Fond arrondi aux couleurs du ciel, dessiné à la taille du widget (divisée par 2 pour la mémoire). */
-    fun background(code: Int, isDay: Boolean, widthPx: Int, heightPx: Int, radiusPx: Float): Bitmap {
-        val w = (widthPx / 2).coerceIn(40, 800)
-        val h = (heightPx / 2).coerceIn(40, 800)
-        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val c = Canvas(bmp)
-        val colors = sky(kind(code), isDay)
-        val paint = p(0).apply { shader = LinearGradient(0f, 0f, w * 0.4f, h.toFloat(), colors[0], colors[1], Shader.TileMode.CLAMP) }
-        val r = radiusPx / 2
-        c.drawRoundRect(RectF(0f, 0f, w.toFloat(), h.toFloat()), r, r, paint)
-        // Lueur douce du soleil ou de la lune dans le coin.
-        if (kind(code) == Kind.CLEAR || kind(code) == Kind.PARTLY) {
-            val glow = if (isDay) Color.argb(90, 255, 230, 150) else Color.argb(50, 200, 210, 255)
-            c.save()
-            c.clipRect(0f, 0f, w.toFloat(), h.toFloat())
-            c.drawCircle(w * 0.12f, h * 0.15f, h * 0.9f, p(0).apply {
-                shader = RadialGradient(w * 0.12f, h * 0.15f, h * 0.9f, glow, Color.argb(0, 255, 255, 255), Shader.TileMode.CLAMP)
-            })
-            c.restore()
-        }
-        return bmp
-    }
 }

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Petit widget : icône, température, vent et pluie. Le vent et la pluie se masquent s'ils ne tiennent pas. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Fond séparé : sa couleur et sa transparence sont réglables depuis l'appli. -->
     <ImageView
         android:id="@+id/bg"
         android:layout_width="match_parent"
@@ -13,40 +13,43 @@
         android:scaleType="fitXY"
         android:src="@drawable/widget_bg" />
 
-<LinearLayout
-    android:id="@+id/content"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="10dp">
-
-
     <LinearLayout
+        android:id="@+id/content"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:gravity="center_vertical"
-        android:orientation="horizontal">
-        <!-- Icône animée : le widget fait défiler les images dessinées par WeatherArt. -->
-    <ViewFlipper
-        android:id="@+id/icon_anim"
-        android:layout_width="46dp"
-        android:layout_height="46dp"
-        android:autoStart="true"
-        android:flipInterval="160">
-        <ImageView android:id="@+id/icon_f0" android:layout_width="46dp" android:layout_height="46dp" android:contentDescription="@null" />
-        <ImageView android:id="@+id/icon_f1" android:layout_width="46dp" android:layout_height="46dp" android:contentDescription="@null" />
-        <ImageView android:id="@+id/icon_f2" android:layout_width="46dp" android:layout_height="46dp" android:contentDescription="@null" />
-        <ImageView android:id="@+id/icon_f3" android:layout_width="46dp" android:layout_height="46dp" android:contentDescription="@null" />
-        <ImageView android:id="@+id/icon_f4" android:layout_width="46dp" android:layout_height="46dp" android:contentDescription="@null" />
-        <ImageView android:id="@+id/icon_f5" android:layout_width="46dp" android:layout_height="46dp" android:contentDescription="@null" />
-        <ImageView android:id="@+id/icon_f6" android:layout_width="46dp" android:layout_height="46dp" android:contentDescription="@null" />
-        <ImageView android:id="@+id/icon_f7" android:layout_width="46dp" android:layout_height="46dp" android:contentDescription="@null" />
-    </ViewFlipper>
-        <TextView android:id="@+id/temp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="4dp" android:fontFamily="sans-serif-light" android:textColor="#FFFFFF" android:textSize="32sp" android:text="--°" />
-        <TextClock android:id="@+id/clock_small" style="@style/WText" android:layout_width="0dp" android:layout_weight="1" android:gravity="end" android:fontFamily="sans-serif-light" android:textSize="22sp" android:format12Hour="HH:mm" android:format24Hour="HH:mm" />
-        <TextView android:id="@+id/refresh" style="@style/WSmall" android:paddingStart="8dp" android:text="⟳" />
+        android:orientation="vertical"
+        android:paddingStart="12dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="8dp">
+
+        <LinearLayout
+            android:id="@+id/hero"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <ViewFlipper
+                android:id="@+id/icon_anim"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:autoStart="true"
+                android:flipInterval="160">
+            <ImageView android:id="@+id/icon_f0" android:layout_width="40dp" android:layout_height="40dp" android:contentDescription="@null" />
+            <ImageView android:id="@+id/icon_f1" android:layout_width="40dp" android:layout_height="40dp" android:contentDescription="@null" />
+            <ImageView android:id="@+id/icon_f2" android:layout_width="40dp" android:layout_height="40dp" android:contentDescription="@null" />
+            <ImageView android:id="@+id/icon_f3" android:layout_width="40dp" android:layout_height="40dp" android:contentDescription="@null" />
+            <ImageView android:id="@+id/icon_f4" android:layout_width="40dp" android:layout_height="40dp" android:contentDescription="@null" />
+            <ImageView android:id="@+id/icon_f5" android:layout_width="40dp" android:layout_height="40dp" android:contentDescription="@null" />
+            <ImageView android:id="@+id/icon_f6" android:layout_width="40dp" android:layout_height="40dp" android:contentDescription="@null" />
+            <ImageView android:id="@+id/icon_f7" android:layout_width="40dp" android:layout_height="40dp" android:contentDescription="@null" />
+            </ViewFlipper>
+            <TextView android:id="@+id/temp" style="@style/WText" android:layout_marginStart="4dp" android:fontFamily="sans-serif-thin" android:includeFontPadding="false" android:textSize="34sp" android:text="--°" />
+            <TextClock android:id="@+id/clock_small" style="@style/WText" android:layout_width="0dp" android:layout_weight="1" android:gravity="end" android:fontFamily="sans-serif-light" android:textSize="20sp" android:format12Hour="HH:mm" android:format24Hour="HH:mm" />
+            <TextView android:id="@+id/refresh" style="@style/WMuted" android:paddingStart="8dp" android:textSize="14sp" android:text="⟳" />
+        </LinearLayout>
+        <TextView android:id="@+id/wind" style="@style/WBold" android:layout_width="match_parent" android:text="" />
+        <TextView android:id="@+id/rain" style="@style/WMuted" android:layout_width="match_parent" android:text="" />
     </LinearLayout>
-    <TextView android:id="@+id/wind" style="@style/WText" android:textStyle="bold" android:text="" />
-    <TextView android:id="@+id/rain" style="@style/WSmall" android:ellipsize="end" android:text="" />
-</LinearLayout>
 </FrameLayout>

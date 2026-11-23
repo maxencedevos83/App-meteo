@@ -97,7 +97,7 @@ class MainActivity : Activity() {
         }))
         slider("Taille du texte", 70, 150, { style.textScale }, { "$it %" }) { update(style.copy(textScale = it)) }
 
-        label("Prévision dans le widget")
+        label("Prévision affichée en premier dans le widget")
         add(radios(listOf("Par jour" to 1, "Par heure" to 0), { if (style.daily) 1 else 0 }) { update(style.copy(daily = it == 1)) })
 
         add(CheckBox(this).apply {
@@ -226,6 +226,10 @@ class MainActivity : Activity() {
         }
         updatePreview()
         refresh()
+        // Essai sur émulateur : aperçus du widget à plusieurs tailles (scripts/android/smoke.sh).
+        if (intent?.getBooleanExtra("apercus", false) == true) {
+            column.post { runCatching { WidgetPreviews.render(this) }.onFailure { Log.e("Meteo", "Aperçus du widget impossibles", it) } }
+        }
     }
 
     // Android 13+ : autorisation nécessaire pour afficher les notifications.
@@ -289,14 +293,16 @@ class MainActivity : Activity() {
 
     private fun updatePreview() {
         runCatching {
-            val views = MeteoWidget.build(this, MeteoData.cached(this), MeteoWidget.Size.MEDIUM, 320, 210)
+            // Place de l'aperçu : largeur de l'écran moins les marges, 210 dp de haut.
+            val w = (resources.displayMetrics.widthPixels / dp).toInt() - 60
+            val views = MeteoWidget.build(this, MeteoData.cached(this), w, 210)
             preview.removeAllViews()
             preview.addView(views.apply(this, preview))
         }.onFailure { Log.e("Meteo", "Aperçu du widget impossible", it) }
-        // Vérifie aussi les deux autres tailles : un élément refusé par l'écran d'accueil y afficherait une erreur.
-        for ((size, w, h) in listOf(Triple(MeteoWidget.Size.SMALL, 180, 90), Triple(MeteoWidget.Size.LARGE, 360, 420))) {
-            runCatching { MeteoWidget.build(this, MeteoData.cached(this), size, w, h).apply(this, FrameLayout(this)) }
-                .onFailure { Log.e("Meteo", "Widget $size impossible à afficher", it) }
+        // Vérifie aussi le petit et le grand format : un élément refusé par l'écran d'accueil y afficherait une erreur.
+        for ((w, h) in listOf(150 to 80, 360 to 440)) {
+            runCatching { MeteoWidget.build(this, MeteoData.cached(this), w, h).apply(this, FrameLayout(this)) }
+                .onFailure { Log.e("Meteo", "Widget $w × $h impossible à afficher", it) }
         }
     }
 

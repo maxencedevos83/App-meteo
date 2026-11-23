@@ -6,12 +6,22 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Bitmap
 import android.location.Location
 import android.location.LocationManager
+import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.AlarmClock
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.RelativeSizeSpan
 import android.util.Log
+import android.util.SizeF
 import android.view.View
+import android.widget.FrameLayout
 import android.widget.RemoteViews
 import org.json.JSONObject
 import kotlin.concurrent.thread
@@ -49,119 +59,189 @@ class MeteoWidget : AppWidgetProvider() {
     private fun refreshAsync(context: Context) {
         val pending = goAsync()
         thread {
+            var data: JSONObject? = null
             try {
-                val data = MeteoData.refresh(context)
-                runCatching { render(context, data) }
+                data = MeteoData.refresh(context)
                 if (MeteoData.lastError(context) == null) runCatching { Notifier.notifyNew(context, data) }
             } finally {
-                pending.finish()
+                // La mise en page se mesure sur le fil principal (comme l'écran d'accueil).
+                MAIN.post {
+                    runCatching { renderNow(context, data) }.onFailure { Log.w("Meteo", "Widget", it) }
+                    pending.finish()
+                }
             }
         }
     }
 
-    enum class Size { SMALL, MEDIUM, LARGE }
+    /** Images déjà dessinées, partagées entre les tailles (l'écran d'accueil ne les reçoit qu'une fois). */
+    class Icons {
+        private val cache = HashMap<String, Bitmap>()
+        fun get(code: Int, isDay: Boolean, windy: Boolean, px: Int, frame: Int): Bitmap =
+            cache.getOrPut("$code/$isDay/$windy/$px/$frame") { WeatherArt.icon(code, isDay, windy, px, frame) }
+    }
+
+    /** Un bloc facultatif : les vues qu'il montre, et celles qu'il remplace quand il est affiché. */
+    private class Block(val show: List<Int>, val hide: List<Int> = emptyList())
 
     companion object {
         const val ACTION_REFRESH = "fr.maxence.meteo.REFRESH"
         const val ACTION_MOVED = "fr.maxence.meteo.MOVED"
+        private val MAIN = Handler(Looper.getMainLooper())
         private val ICON_FRAMES = listOf(
             R.id.icon_f0, R.id.icon_f1, R.id.icon_f2, R.id.icon_f3, R.id.icon_f4, R.id.icon_f5, R.id.icon_f6, R.id.icon_f7,
         )
 
         fun render(context: Context, data: JSONObject?) {
+            if (Looper.myLooper() == Looper.getMainLooper()) renderNow(context, data)
+            else MAIN.post { runCatching { renderNow(context, data) }.onFailure { Log.w("Meteo", "Widget", it) } }
+        }
+
+        private fun renderNow(context: Context, data: JSONObject?) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, MeteoWidget::class.java))
+            val style = WidgetStyle.load(context)
+            val icons = Icons()
             for (id in ids) {
                 val options = manager.getAppWidgetOptions(id)
-                val minW = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
-                val maxW = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, minW)
-                val minH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 110)
-                val maxH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, minH)
-                // La taille choisie par l'utilisateur décide de la mise en page.
-                val size = when {
-                    minW < 200 || maxH < 100 -> Size.SMALL
-                    maxH >= 230 -> Size.LARGE
-                    else -> Size.MEDIUM
+                // Android 12 et plus : une mise en page par taille réelle (portrait, paysage), l'écran d'accueil
+                // choisit celle qui correspond exactement à la place du widget.
+                val sizes = if (Build.VERSION.SDK_INT >= 31) {
+                    @Suppress("DEPRECATION")
+                    options.getParcelableArrayList<SizeF>(AppWidgetManager.OPTION_APPWIDGET_SIZES)
+                        ?.filter { it.width > 0 && it.height > 0 }?.distinct()?.take(4)
+                } else null
+                val views = if (Build.VERSION.SDK_INT >= 31 && !sizes.isNullOrEmpty()) {
+                    RemoteViews(sizes.associateWith { build(context, data, it.width.toInt(), it.height.toInt(), style, icons) })
+                } else {
+                    // Avant Android 12 : largeur mini et hauteur maxi = taille en portrait.
+                    val w = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
+                    val h = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 110)
+                    build(context, data, w, h, style, icons)
                 }
-                manager.updateAppWidget(id, build(context, data, size, maxW, maxH))
+                manager.updateAppWidget(id, views)
             }
         }
 
-        fun build(context: Context, data: JSONObject?, size: Size, widthDp: Int, heightDp: Int): RemoteViews {
-            // Recalée sur l'heure actuelle (jour/nuit, temps de l'heure en cours).
+        /**
+         * Widget pour une place de [widthDp] × [heightDp]. Le contenu est mesuré pour cette place :
+         * les blocs les moins utiles sont masqués plutôt que coupés, et le petit modèle prend le relais
+         * quand même l'essentiel ne tient pas.
+         */
+        fun build(
+            context: Context, data: JSONObject?, widthDp: Int, heightDp: Int,
+            style: WidgetStyle.Style = WidgetStyle.load(context), icons: Icons = Icons(),
+        ): RemoteViews {
             val d = data?.let { runCatching { MeteoData.fresh(it) }.getOrDefault(it) }
-            val layout = when (size) {
-                Size.SMALL -> R.layout.widget_small
-                Size.MEDIUM -> R.layout.widget_meteo
-                Size.LARGE -> R.layout.widget_large
+            if (widthDp >= 180) {
+                val (v, blocks) = full(context, d, widthDp, style, icons)
+                if (fit(context, v, widthDp, heightDp, blocks)) return v
             }
+            val (v, blocks) = small(context, d, style, icons)
+            fit(context, v, widthDp, heightDp, blocks)
+            return v
+        }
+
+        private fun num(o: JSONObject, k: String): Double? = if (o.isNull(k)) null else o.optDouble(k).takeIf { !it.isNaN() }
+        private fun int(o: JSONObject, k: String) = num(o, k)?.let { Math.round(it).toString() } ?: "–"
+
+        /** Commun aux deux modèles : appuis, apparence, icône animée et fond du ciel. */
+        private fun common(context: Context, layout: Int, d: JSONObject?, style: WidgetStyle.Style, icons: Icons, iconDp: Int): RemoteViews {
             val v = RemoteViews(context.packageName, layout)
-            // Appui sur le widget : l'appli complète de l'APK (plus le site).
+            // Appui sur le widget : l'appli complète de l'APK.
             val open = Intent(context, AppActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             v.setOnClickPendingIntent(R.id.root, PendingIntent.getActivity(context, 0, open, PendingIntent.FLAG_IMMUTABLE))
             val refresh = Intent(context, MeteoWidget::class.java).setAction(ACTION_REFRESH)
             v.setOnClickPendingIntent(R.id.refresh, PendingIntent.getBroadcast(context, 1, refresh, PendingIntent.FLAG_IMMUTABLE))
-
-            // Apparence choisie dans l'appli, et horloge (un appui ouvre l'horloge du téléphone).
-            val style = WidgetStyle.load(context)
-            WidgetStyle.apply(context, v, layout, style)
+            // Un appui sur l'horloge ouvre l'horloge du téléphone.
             val alarms = PendingIntent.getActivity(context, 3, Intent(AlarmClock.ACTION_SHOW_ALARMS), PendingIntent.FLAG_IMMUTABLE)
             v.setOnClickPendingIntent(R.id.clock_small, alarms)
-            val bigClock = size != Size.SMALL && style.clock == WidgetStyle.CLOCK_BIG
-            if (size == Size.SMALL) {
-                v.setViewVisibility(R.id.clock_small, if (style.clock == WidgetStyle.CLOCK_HIDDEN) View.GONE else View.VISIBLE)
-            } else {
-                v.setViewVisibility(R.id.clock_row, if (bigClock) View.VISIBLE else View.GONE)
-                v.setViewVisibility(R.id.date, if (style.showDate) View.VISIBLE else View.GONE)
-                v.setViewVisibility(R.id.clock_small, if (style.clock == WidgetStyle.CLOCK_SMALL) View.VISIBLE else View.GONE)
-                v.setOnClickPendingIntent(R.id.clock_row, alarms)
-            }
-            // Place prise par la grande horloge, selon la taille du texte.
-            val clockDp = if (bigClock) 56 * style.textScale / 100 else 0
 
-            if (d == null) {
-                if (size == Size.SMALL) {
-                    v.setTextViewText(R.id.wind, "Pas de données")
-                    v.setTextViewText(R.id.rain, "Touchez ⟳")
-                } else {
-                    v.setTextViewText(R.id.cond, "Pas encore de données")
-                    v.setTextViewText(R.id.footer, MeteoData.lastError(context) ?: "Touchez ⟳ pour actualiser")
-                }
-                return v
-            }
-
-            fun num(o: JSONObject, k: String): Double? = if (o.isNull(k)) null else o.optDouble(k).takeIf { !it.isNaN() }
-            fun int(o: JSONObject, k: String) = num(o, k)?.let { Math.round(it).toString() } ?: "–"
-
-            val density = context.resources.displayMetrics.density
-            val code = d.optInt("code", 3)
-            val isDay = d.optBoolean("isDay", true)
+            WidgetStyle.apply(context, v, layout, style)
+            val code = d?.optInt("code", 3) ?: 3
+            val isDay = d?.optBoolean("isDay", true) ?: true
+            val windy = d != null && ((num(d, "gust") ?: 0.0) >= 30 || (num(d, "wind") ?: 0.0) >= 18)
+            val px = (iconDp * context.resources.displayMetrics.density).toInt()
             // Icône animée : une image par étape de la boucle (la même partout si les animations sont coupées).
-            val windy = (num(d, "gust") ?: 0.0) >= 30 || (num(d, "wind") ?: 0.0) >= 18
-            val iconPx = ((if (size == Size.SMALL) 46 else 60) * density).toInt()
-            val still = if (style.animated) null else WeatherArt.icon(code, isDay, windy, iconPx, 0)
-            ICON_FRAMES.forEachIndexed { i, id -> v.setImageViewBitmap(id, still ?: WeatherArt.icon(code, isDay, windy, iconPx, i)) }
-            // Fond aux couleurs du ciel.
-            if (style.bgColor == WidgetStyle.WEATHER) {
-                v.setImageViewBitmap(R.id.bg, WeatherArt.background(code, isDay, (widthDp * density).toInt(), (heightDp * density).toInt(), 22 * density))
+            ICON_FRAMES.forEachIndexed { i, id -> v.setImageViewBitmap(id, icons.get(code, isDay, windy, px, if (style.animated) i else 0)) }
+            // Fond aux couleurs du ciel de l'appli (mêmes teintes, aube et crépuscule compris).
+            if (style.bgColor == WidgetStyle.WEATHER && d != null) v.setImageViewResource(R.id.bg, skyDrawable(d, code, isDay))
+            return v
+        }
+
+        private fun skyDrawable(d: JSONObject, code: Int, isDay: Boolean): Int {
+            val kind = WeatherArt.kind(code)
+            if (kind == WeatherArt.Kind.CLEAR || kind == WeatherArt.Kind.PARTLY) {
+                // Comme dayPhase() de l'appli : de 40 min avant à 50 min après le lever, de 50 min avant à 40 min après le coucher.
+                val now = System.currentTimeMillis()
+                val sky = Astro.day(now, d.optDouble("lat", 43.1375), d.optDouble("lon", 6.3683))
+                val min = 60_000L
+                val rise = sky.sunrise
+                val set = sky.sunset
+                if (rise != null && now in (rise - 40 * min)..(rise + 50 * min)) return R.drawable.sky_dawn
+                if (set != null && now in (set - 50 * min)..(set + 40 * min)) return R.drawable.sky_dusk
+            }
+            return when (kind) {
+                WeatherArt.Kind.CLEAR -> if (isDay) R.drawable.sky_clear_day else R.drawable.sky_clear_night
+                WeatherArt.Kind.PARTLY -> if (isDay) R.drawable.sky_partly_day else R.drawable.sky_partly_night
+                WeatherArt.Kind.CLOUDY -> if (isDay) R.drawable.sky_cloudy_day else R.drawable.sky_cloudy_night
+                WeatherArt.Kind.FOG -> if (isDay) R.drawable.sky_fog_day else R.drawable.sky_fog_night
+                WeatherArt.Kind.DRIZZLE, WeatherArt.Kind.RAIN -> if (isDay) R.drawable.sky_rain_day else R.drawable.sky_rain_night
+                WeatherArt.Kind.SNOW -> if (isDay) R.drawable.sky_snow_day else R.drawable.sky_snow_night
+                WeatherArt.Kind.STORM -> R.drawable.sky_storm
+            }
+        }
+
+        private fun windLine(d: JSONObject) =
+            "${MeteoData.arrow(num(d, "dirDeg"))} ${MeteoData.kmh(num(d, "wind"))} km/h · raf. ${MeteoData.kmh(num(d, "gust"))} ${d.optString("dir")}"
+
+        private fun small(context: Context, d: JSONObject?, style: WidgetStyle.Style, icons: Icons): Pair<RemoteViews, List<Block>> {
+            val v = common(context, R.layout.widget_small, d, style, icons, 40)
+            v.setViewVisibility(R.id.clock_small, if (style.clock == WidgetStyle.CLOCK_HIDDEN) View.INVISIBLE else View.VISIBLE)
+            if (d == null) {
+                v.setTextViewText(R.id.wind, "Pas de données")
+                v.setTextViewText(R.id.rain, "Touchez ⟳")
+                return v to listOf(Block(listOf(R.id.wind)), Block(listOf(R.id.rain)))
             }
             v.setTextViewText(R.id.temp, "${int(d, "temp")}°")
-            v.setTextViewText(R.id.wind, "${MeteoData.arrow(num(d, "dirDeg"))} ${MeteoData.kmh(num(d, "wind"))} km/h · raf. ${MeteoData.kmh(num(d, "gust"))} ${d.optString("dir")}")
+            v.setTextViewText(R.id.wind, windLine(d))
             val rain = d.optString("rain")
             val sea = num(d, "sea")?.let { " · mer ${Math.round(it)}°" } ?: ""
-            v.setTextViewText(R.id.rain, "💧 ${if (rain.isNotEmpty()) rain else "${int(d, "pop")} % de pluie"}$sea")
-            if (size == Size.SMALL) return v
+            v.setTextViewText(R.id.rain, "💧 ${rain.ifEmpty { "${int(d, "pop")} % de pluie" }}$sea")
+            return v to listOf(Block(listOf(R.id.wind)), Block(listOf(R.id.rain)))
+        }
 
+        private fun full(context: Context, d: JSONObject?, widthDp: Int, style: WidgetStyle.Style, icons: Icons): Pair<RemoteViews, List<Block>> {
+            val v = common(context, R.layout.widget_meteo, d, style, icons, 56)
+            val scale = style.textScale.coerceIn(50, 200) / 100f
+            val blocks = mutableListOf<Block>()
+
+            // Horloge : grande (bloc facultatif, en tête), petite dans l'en-tête, ou masquée.
+            v.setViewVisibility(R.id.date, if (style.showDate) View.VISIBLE else View.GONE)
+            v.setViewVisibility(R.id.clock_small, if (style.clock == WidgetStyle.CLOCK_SMALL) View.VISIBLE else View.GONE)
+            v.setOnClickPendingIntent(R.id.clock_row, PendingIntent.getActivity(context, 3, Intent(AlarmClock.ACTION_SHOW_ALARMS), PendingIntent.FLAG_IMMUTABLE))
+            if (style.clock == WidgetStyle.CLOCK_BIG) blocks += Block(listOf(R.id.clock_row)) else v.setViewVisibility(R.id.clock_row, View.GONE)
+
+            for (id in listOf(R.id.alert, R.id.tiles, R.id.strip_a, R.id.strip_b, R.id.sky, R.id.sessions)) v.setViewVisibility(id, View.GONE)
+            if (d == null) {
+                v.setTextViewText(R.id.cond, "Pas encore de données")
+                v.setTextViewText(R.id.feels, MeteoData.lastError(context) ?: "Touchez ⟳ pour actualiser")
+                v.setViewVisibility(R.id.wind, View.GONE)
+                return v to blocks
+            }
+
+            // En-tête : lieu (📍 = prévision calculée pour l'endroit où l'on est) et heure de mise à jour.
             v.setTextViewText(R.id.place, (if (d.optBoolean("local")) "📍 " else "") + d.optString("place"))
+            val stale = MeteoData.lastError(context)?.let { " · hors ligne" } ?: ""
+            v.setTextViewText(R.id.updated, "maj ${d.optString("updated")}$stale")
+
+            // Temps actuel.
+            v.setTextViewText(R.id.temp, "${int(d, "temp")}°")
             v.setTextViewText(R.id.cond, d.optString("cond"))
-            v.setTextViewText(R.id.minmax, "${int(d, "min")}° / ${int(d, "max")}° · ressenti ${int(d, "feels")}°")
+            v.setTextViewText(R.id.feels, "Ressenti ${int(d, "feels")}°")
+            v.setTextViewText(R.id.minmax, "↓${int(d, "min")}°  ↑${int(d, "max")}°")
+            v.setTextViewText(R.id.wind, windLine(d))
 
-            // Soleil et lune du jour, calculés ici pour le lieu affiché.
-            val sky = Astro.day(System.currentTimeMillis(), d.optDouble("lat", 43.1375), d.optDouble("lon", 6.3683))
-            v.setTextViewText(R.id.sky, "☀ ${Astro.hm(sky.sunrise)} – ${Astro.hm(sky.sunset)}   ${sky.moonEmoji} ${Astro.hm(sky.moonrise)} – ${Astro.hm(sky.moonset)}")
-            v.setViewVisibility(R.id.sky, if (size == Size.MEDIUM && heightDp < 150 + clockDp) View.GONE else View.VISIBLE)
-
-            // Alerte la plus importante (vigilance, orage, coup de vent, pluie).
+            // Alerte la plus importante (vigilance, orage, coup de vent, pluie), teintée selon son niveau.
             val alerts = d.optJSONArray("alerts")
             var top: JSONObject? = null
             if (alerts != null) for (i in 0 until alerts.length()) {
@@ -170,85 +250,171 @@ class MeteoWidget : AppWidgetProvider() {
                 if (top == null || a.optInt("level") > top.optInt("level")) top = a
             }
             if (top != null) {
-                v.setViewVisibility(R.id.alert, View.VISIBLE)
                 v.setTextViewText(R.id.alert, "⚠ ${top.optString("title")}")
-            } else {
-                v.setViewVisibility(R.id.alert, View.GONE)
+                val bg = when (top.optInt("level").coerceIn(1, 4)) {
+                    1 -> R.drawable.alert_bg_1
+                    2 -> R.drawable.alert_bg_2
+                    3 -> R.drawable.alert_bg_3
+                    else -> R.drawable.alert_bg_4
+                }
+                v.setInt(R.id.alert, "setBackgroundResource", bg)
+                blocks += Block(listOf(R.id.alert))
             }
 
+            // Cases vent, pluie, mer, fiabilité : autant qu'il en tient en largeur.
+            fillTiles(v, d, widthDp, scale)
+
+            // Prévisions : par jour ou par heure en premier selon le réglage, l'autre ensuite s'il reste de la place.
+            val cols = ((widthDp - 36) / (46 * scale)).toInt().coerceIn(3, 6)
             val hours = d.optJSONArray("h")
-            val hourIds = listOf(
-                arrayOf(R.id.h0_t, R.id.h0_icon, R.id.h0_temp, R.id.h0_wind),
-                arrayOf(R.id.h1_t, R.id.h1_icon, R.id.h1_temp, R.id.h1_wind),
-                arrayOf(R.id.h2_t, R.id.h2_icon, R.id.h2_temp, R.id.h2_wind),
-                arrayOf(R.id.h3_t, R.id.h3_icon, R.id.h3_temp, R.id.h3_wind),
-                arrayOf(R.id.h4_t, R.id.h4_icon, R.id.h4_temp, R.id.h4_wind),
-                arrayOf(R.id.h5_t, R.id.h5_icon, R.id.h5_temp, R.id.h5_wind),
-            )
             val days = d.optJSONArray("d")
-            val smallIconPx = (26 * density).toInt()
-            // Colonne d'un jour : nom (et risque de pluie), icône, min/max, vent moyen·rafales.
-            fun fillDay(ids: Array<Int>, day: JSONObject) {
-                val pop = num(day, "pop") ?: 0.0
-                v.setTextViewText(ids[0], if (pop >= 40) "${day.optString("day")} ${Math.round(pop)}%" else day.optString("day"))
-                v.setImageViewBitmap(ids[1], WeatherArt.icon(day.optInt("code", 3), true, false, smallIconPx, 0))
-                v.setTextViewText(ids[2], "${int(day, "min")}/${int(day, "max")}°")
-                val wind = num(day, "wind") ?: 0.0
-                v.setTextViewText(ids[3], "${MeteoData.kmh(wind)}·${MeteoData.kmh(num(day, "gust"))}")
-                v.setInt(ids[3], "setBackgroundColor", MeteoData.windColor(wind))
-            }
+            val hourNow = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+            // En fin de journée, les jours commencent à demain.
+            val dayStart = if (hourNow >= 20 && days != null && days.length() > cols) 1 else 0
+            val hourList = (0 until (hours?.length() ?: 0)).mapNotNull { hours?.optJSONObject(it) }
+            val dayList = (dayStart until (days?.length() ?: 0)).mapNotNull { days?.optJSONObject(it) }
+            val (first, second) = if (style.daily) (dayList to true) to (hourList to false) else (hourList to false) to (dayList to true)
+            if (fillStrip(context, v, "a", first.first, first.second, cols, icons)) blocks += Block(listOf(R.id.strip_a))
+            blocks += Block(listOf(R.id.tiles), hide = listOf(R.id.wind))
+            if (fillStrip(context, v, "b", second.first, second.second, cols, icons)) blocks += Block(listOf(R.id.strip_b))
 
-            // Un widget moyen peu haut n'affiche pas la ligne des prévisions.
-            v.setViewVisibility(R.id.hours, when {
-                size == Size.MEDIUM && heightDp < 130 + clockDp -> View.GONE
-                else -> View.VISIBLE
-            })
-            if (size == Size.MEDIUM && style.daily) {
-                // Prévision sur plusieurs jours, à partir de demain quand la journée est presque finie.
-                val hourNow = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-                val start = if (hourNow >= 20 && days != null && days.length() > hourIds.size) 1 else 0
-                hourIds.forEachIndexed { i, ids ->
-                    val day = days?.optJSONObject(start + i)
-                    if (day != null) fillDay(ids, day) else ids.forEach { id -> v.setTextViewText(id, "") }
+            // Soleil et lune du jour, calculés ici pour le lieu affiché.
+            val sky = Astro.day(System.currentTimeMillis(), d.optDouble("lat", 43.1375), d.optDouble("lon", 6.3683))
+            v.setTextViewText(R.id.sky, "☀ ${Astro.hm(sky.sunrise)} – ${Astro.hm(sky.sunset)}    ${sky.moonEmoji} ${Astro.hm(sky.moonrise)} – ${Astro.hm(sky.moonset)}")
+            blocks += Block(listOf(R.id.sky))
+
+            val sessions = d.optJSONArray("sessions")
+            val parts = mutableListOf<String>()
+            if (sessions != null) for (i in 0 until sessions.length()) {
+                val s = sessions.getJSONObject(i)
+                if (s.optString("id") == "balade") continue
+                parts.add("${s.optString("emoji")} ${s.optString("when")}")
+            }
+            if (parts.isNotEmpty()) {
+                v.setTextViewText(R.id.sessions, parts.joinToString("   "))
+                blocks += Block(listOf(R.id.sessions))
+            }
+            return v to blocks
+        }
+
+        private fun fillTiles(v: RemoteViews, d: JSONObject, widthDp: Int, scale: Float) {
+            // Unité en plus petit, comme « 15 km/h » dans l'appli.
+            fun small(s: String) = SpannableStringBuilder(s).apply {
+                setSpan(RelativeSizeSpan(0.62f), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            v.setTextViewText(R.id.tile_wind_value, SpannableStringBuilder("${MeteoData.arrow(num(d, "dirDeg"))} ${MeteoData.kmh(num(d, "wind"))}").append(small(" km/h")))
+            v.setTextViewText(R.id.tile_wind_sub, "${d.optString("dir")} · raf. ${MeteoData.kmh(num(d, "gust"))}")
+
+            val pop = num(d, "pop") ?: 0.0
+            v.setTextViewText(R.id.tile_rain_value, SpannableStringBuilder("${Math.round(pop)}").append(small(" %")))
+            v.setTextViewText(R.id.tile_rain_sub, d.optString("rain").ifEmpty { if (pop < 30) "pas de pluie prévue" else "risque cette heure" })
+
+            val sea = num(d, "sea")
+            if (sea != null) {
+                v.setTextViewText(R.id.tile_sea_value, "${Math.round(sea)}°")
+                v.setTextViewText(R.id.tile_sea_sub, num(d, "wave")?.let { "vagues ${String.format(java.util.Locale.FRANCE, "%.1f", it)} m" } ?: "eau")
+            }
+            v.setTextViewText(R.id.tile_conf_value, SpannableStringBuilder(int(d, "confidence")).append(small(" %")))
+            v.setTextViewText(R.id.tile_conf_sub, "${int(d, "sources")} modèles")
+
+            // Une case fait au moins ~80 dp (plus si le texte est agrandi) : les dernières sautent sur un widget étroit.
+            val room = ((widthDp - 28) / (80 * scale)).toInt().coerceIn(2, 4)
+            val shown = listOfNotNull(R.id.tile_wind, R.id.tile_rain, if (sea != null) R.id.tile_sea else null, R.id.tile_conf).take(room)
+            for (id in listOf(R.id.tile_wind, R.id.tile_rain, R.id.tile_sea, R.id.tile_conf)) v.setViewVisibility(id, if (id in shown) View.VISIBLE else View.GONE)
+        }
+
+        /** Remplit une ligne de prévision (colonnes [prefix]0 à 5) ; false si elle est vide. */
+        private fun fillStrip(context: Context, v: RemoteViews, prefix: String, items: List<JSONObject>, daily: Boolean, cols: Int, icons: Icons): Boolean {
+            if (items.isEmpty()) return false
+            val res = context.resources
+            fun id(name: String) = res.getIdentifier("$prefix$name", "id", context.packageName)
+            val iconPx = (28 * res.displayMetrics.density).toInt()
+            // Ligne « risque de pluie » seulement si une colonne affichée en a.
+            val popMin = 30.0
+            val anyPop = items.take(cols).any { (num(it, "pop") ?: 0.0) >= popMin }
+            for (i in 0 until 6) {
+                val item = items.getOrNull(i)
+                if (i >= cols || item == null) {
+                    v.setViewVisibility(id("$i"), View.GONE)
+                    continue
                 }
-            } else hourIds.forEachIndexed { i, ids ->
-                val h = hours?.optJSONObject(i) ?: return@forEachIndexed
-                val pop = num(h, "pop") ?: 0.0
-                v.setTextViewText(ids[0], if (pop >= 30) "${h.optString("t")} ${Math.round(pop)}%" else h.optString("t"))
-                v.setImageViewBitmap(ids[1], WeatherArt.icon(h.optInt("code", 3), h.optBoolean("isDay", true), false, smallIconPx, 0))
-                v.setTextViewText(ids[2], "${int(h, "temp")}°")
-                val wind = num(h, "wind") ?: 0.0
-                v.setTextViewText(ids[3], "${MeteoData.arrow(num(h, "dirDeg"))}${MeteoData.kmh(wind)}")
-                v.setInt(ids[3], "setBackgroundColor", MeteoData.windColor(wind))
+                v.setViewVisibility(id("$i"), View.VISIBLE)
+                val pop = num(item, "pop") ?: 0.0
+                val wind = num(item, "wind") ?: 0.0
+                if (daily) {
+                    v.setTextViewText(id("${i}_t"), item.optString("day"))
+                    v.setImageViewBitmap(id("${i}_icon"), icons.get(item.optInt("code", 3), true, false, iconPx, 0))
+                    v.setTextViewText(id("${i}_temp"), "${int(item, "max")}°")
+                    v.setTextViewText(id("${i}_min"), "${int(item, "min")}°")
+                    v.setViewVisibility(id("${i}_min"), View.VISIBLE)
+                    v.setTextViewText(id("${i}_wind"), "${MeteoData.kmh(wind)}·${MeteoData.kmh(num(item, "gust"))}")
+                } else {
+                    v.setTextViewText(id("${i}_t"), item.optString("t"))
+                    v.setImageViewBitmap(id("${i}_icon"), icons.get(item.optInt("code", 3), item.optBoolean("isDay", true), false, iconPx, 0))
+                    v.setTextViewText(id("${i}_temp"), "${int(item, "temp")}°")
+                    v.setViewVisibility(id("${i}_min"), View.GONE)
+                    v.setTextViewText(id("${i}_wind"), "${MeteoData.arrow(num(item, "dirDeg"))}${MeteoData.kmh(wind)}")
+                }
+                v.setViewVisibility(id("${i}_pop"), if (anyPop) View.VISIBLE else View.GONE)
+                v.setTextViewText(id("${i}_pop"), if (pop >= popMin) "💧${Math.round(pop)}%" else "")
+                tint(v, id("${i}_wind"), MeteoData.windColor(wind))
             }
+            return true
+        }
 
-            if (size == Size.LARGE) {
-                // Grand widget : les prochaines heures, puis les jours (sans graphe).
-                val dayIds = listOf(
-                    arrayOf(R.id.d0_t, R.id.d0_icon, R.id.d0_temp, R.id.d0_wind),
-                    arrayOf(R.id.d1_t, R.id.d1_icon, R.id.d1_temp, R.id.d1_wind),
-                    arrayOf(R.id.d2_t, R.id.d2_icon, R.id.d2_temp, R.id.d2_wind),
-                    arrayOf(R.id.d3_t, R.id.d3_icon, R.id.d3_temp, R.id.d3_wind),
-                    arrayOf(R.id.d4_t, R.id.d4_icon, R.id.d4_temp, R.id.d4_wind),
+        /** Pastille de vent arrondie teintée (Android 12+), sinon fond uni. */
+        private fun tint(v: RemoteViews, id: Int, color: Int) {
+            if (Build.VERSION.SDK_INT >= 31) v.setColorStateList(id, "setBackgroundTintList", ColorStateList.valueOf(color))
+            else v.setInt(id, "setBackgroundColor", color)
+        }
+
+        /**
+         * Mesure le widget dans sa place réelle, avec les mêmes textes et la même taille de police,
+         * puis n'affiche les blocs facultatifs (par ordre d'importance) que s'ils tiennent en entier.
+         * Renvoie false si même l'essentiel (en-tête et temps actuel) dépasse.
+         */
+        private fun fit(context: Context, v: RemoteViews, widthDp: Int, heightDp: Int, blocks: List<Block>): Boolean {
+            val app = context.applicationContext
+            val density = app.resources.displayMetrics.density
+            val widthPx = (widthDp * density).toInt()
+            // Petite marge : l'écran d'accueil arrondit parfois la place annoncée.
+            val heightPx = ((heightDp - 2) * density).toInt()
+            val root = try {
+                v.apply(app, FrameLayout(app))
+            } catch (e: Exception) {
+                Log.e("Meteo", "Mesure du widget impossible", e)
+                null
+            }
+            fun showRemote(b: Block, on: Boolean) {
+                b.show.forEach { v.setViewVisibility(it, if (on) View.VISIBLE else View.GONE) }
+                b.hide.forEach { v.setViewVisibility(it, if (on) View.GONE else View.VISIBLE) }
+            }
+            if (root == null) {
+                // Sans mesure possible : seulement les deux premiers blocs.
+                blocks.forEachIndexed { i, b -> showRemote(b, i < 2) }
+                return true
+            }
+            val content = root.findViewById<View>(R.id.content)
+            fun show(b: Block, on: Boolean) {
+                b.show.forEach { root.findViewById<View>(it)?.visibility = if (on) View.VISIBLE else View.GONE }
+                b.hide.forEach { root.findViewById<View>(it)?.visibility = if (on) View.GONE else View.VISIBLE }
+            }
+            fun fits(): Boolean {
+                content.measure(
+                    View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
                 )
-                dayIds.forEachIndexed { i, ids ->
-                    val day = days?.optJSONObject(i) ?: return@forEachIndexed
-                    fillDay(ids, day)
-                }
-
-                val sessions = d.optJSONArray("sessions")
-                val parts = mutableListOf<String>()
-                if (sessions != null) for (i in 0 until sessions.length()) {
-                    val s = sessions.getJSONObject(i)
-                    if (s.optString("id") == "balade") continue
-                    parts.add("${s.optString("emoji")} ${s.optString("when")}")
-                }
-                v.setTextViewText(R.id.sessions, if (parts.isEmpty()) "Pas de bon créneau de sortie en bateau sur 5 jours" else parts.joinToString("   "))
+                return content.measuredHeight <= heightPx
             }
-
-            val stale = MeteoData.lastError(context)?.let { " · hors ligne" } ?: ""
-            v.setTextViewText(R.id.footer, "Maj ${d.optString("updated")} · fiabilité ${int(d, "confidence")} % · ${int(d, "sources")} modèles$stale")
-            return v
+            blocks.forEach { show(it, false) }
+            val baseFits = fits()
+            for (b in blocks) {
+                show(b, true)
+                val ok = baseFits && fits()
+                if (!ok) show(b, false)
+                showRemote(b, ok)
+            }
+            return baseFits
         }
     }
 }

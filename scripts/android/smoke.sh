@@ -23,6 +23,13 @@ adb shell am start -W -n $PKG/.AppActivity
 for i in $(seq 1 30); do adb logcat -d -s Meteo:I | grep -q "Appli affichée" && break; sleep 2; done
 sleep 3
 adb exec-out screencap -p > app.png || true
+# Aperçus du widget à plusieurs tailles (gardés dans l'artefact « emulateur »).
+adb shell am start -S -W -n $PKG/.MainActivity --ez apercus true
+for i in $(seq 1 20); do adb logcat -d -s Meteo:I | grep -q "Aperçus du widget prêts" && break; sleep 2; done
+adb pull /sdcard/Android/data/$PKG/files/apercus apercus || true
+adb logcat -d -s Meteo:I | grep "Aperçu " || true
+# Planche des aperçus en base64, lisible depuis le journal de la CI.
+if [ -f apercus/planche.jpg ]; then echo "===== PLANCHE BASE64 ====="; base64 -w0 apercus/planche.jpg; echo; echo "===== FIN PLANCHE ====="; fi
 adb shell input keyevent KEYCODE_HOME
 sleep 3
 echo "===== Plantages ====="

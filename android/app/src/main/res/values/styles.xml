@@ -1,24 +1,69 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Textes du widget : blancs, une seule ligne coupée par « … », légère ombre comme dans l'appli
+         pour rester lisibles sur un fond transparent ou une photo. -->
     <style name="WText">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:textColor">#FFFFFF</item>
         <item name="android:textSize">13sp</item>
         <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:shadowColor">#66000000</item>
+        <item name="android:shadowDy">1</item>
+        <item name="android:shadowRadius">4</item>
+    </style>
+    <!-- Texte secondaire (« muted » de l'appli). -->
+    <style name="WMuted" parent="WText">
+        <item name="android:textColor">#BFFFFFFF</item>
+        <item name="android:textSize">12sp</item>
     </style>
     <style name="WSmall" parent="WText">
         <item name="android:textColor">#D9FFFFFF</item>
         <item name="android:textSize">11sp</item>
     </style>
     <style name="WBold" parent="WText">
-        <item name="android:textStyle">bold</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
     </style>
+    <!-- Titre de case en petites capitales espacées, comme « VENT · PLUIE · FIABILITÉ » dans l'appli. -->
+    <style name="WLabel" parent="WText">
+        <item name="android:textColor">#A6FFFFFF</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.12</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+    <style name="WValue" parent="WText">
+        <item name="android:textSize">17sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+    <!-- Colonnes de prévision : heure ou jour, température, mini, risque de pluie. -->
+    <style name="WColT" parent="WText">
+        <item name="android:textColor">#CCFFFFFF</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+    <style name="WColTemp" parent="WText">
+        <item name="android:textSize">14sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+    <style name="WColMin" parent="WText">
+        <item name="android:textColor">#A6FFFFFF</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+    <style name="WPop" parent="WText">
+        <item name="android:textColor">#7CC4FF</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+    <!-- Pastille de vent : texte foncé sur la couleur du vent (échelle proche de Windguru). -->
     <style name="WWind" parent="WText">
         <item name="android:textColor">#111111</item>
         <item name="android:textSize">11sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
         <item name="android:paddingStart">5dp</item>
         <item name="android:paddingEnd">5dp</item>
-        <item name="android:layout_marginTop">2dp</item>
+        <item name="android:layout_marginTop">3dp</item>
+        <item name="android:background">@drawable/pill_bg</item>
+        <item name="android:shadowRadius">0</item>
     </style>
 </resources>
