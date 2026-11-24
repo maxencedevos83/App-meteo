@@ -1,7 +1,8 @@
 // Assemble la prévision finale (appli) et le résumé compact (widgets).
 import { combine, daily, codeLabel, codeEmoji, dirLabel, localKey, kmh } from './ensemble.js';
-import { buildActivities } from './activities.js';
+import { buildActivities, hasSeaData } from './activities.js';
 import { skyDay } from './astro.js';
+import { mountainSources, applyRainSnow, mountainDays, mountainActivityOptions } from './mountain.js';
 
 const r1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
 const r0 = (v) => (v == null ? null : Math.round(v));
@@ -32,9 +33,12 @@ export function rainNextHour(minutely, nowKey) {
 }
 
 // sources : modèles Open-Meteo + Windguru, déjà normalisés.
-export function buildForecast({ config, sources, ensemblePop = {}, nowcast = null, marine = null, skill = {}, scores = null, errors = [], now = new Date() }) {
+// mountain : lieu montagneux (mountain.js, buildMountain), sinon null.
+export function buildForecast({ config, sources, ensemblePop = {}, nowcast = null, marine = null, mountain = null, skill = {}, scores = null, errors = [], now = new Date() }) {
   const nowKey = localKey(now, config.timezone);
-  const { hours, weights } = combine(sources, { now: nowKey, skill, ensemblePop });
+  // En montagne, les modèles à maille fine (AROME) pèsent davantage, puis la limite pluie-neige décide pluie ou neige.
+  const { hours, weights } = combine(mountain ? mountainSources(sources) : sources, { now: nowKey, skill, ensemblePop });
+  if (mountain) applyRainSnow(hours, mountain);
   const days = daily(hours);
   // Soleil et lune calculés pour le lieu (sans dépendre d'un service).
   const sky = new Map(days.map((d) => [d.date, skyDay(d.date, config.latitude, config.longitude, config.timezone)]));
@@ -59,6 +63,8 @@ export function buildForecast({ config, sources, ensemblePop = {}, nowcast = nul
   }).sort((a, b) => b.weight - a.weight);
 
   const seaHours = marine ? marine.filter((m) => m.time >= nowKey.slice(0, 13) + ':00').slice(0, 120) : null;
+  // Lieu au bord de la mer : déclaré dans la config (orientation de plage) ou vagues connues à cet endroit.
+  const coastal = config.shoreFacing != null || hasSeaData(seaHours);
 
   return {
     generatedAt: now.toISOString(),
@@ -67,6 +73,7 @@ export function buildForecast({ config, sources, ensemblePop = {}, nowcast = nul
     longitude: config.longitude,
     timezone: config.timezone,
     shoreFacing: config.shoreFacing ?? 180,
+    coastal,
     now: nowKey,
     rain: rainNextHour(nowcast?.minutely, nowKey),
     hours: hours.map((h) => ({
@@ -74,10 +81,16 @@ export function buildForecast({ config, sources, ensemblePop = {}, nowcast = nul
       precip: r1(h.precip), pop: h.pop == null ? null : r0(h.pop * 100), wind: r0(h.wind), gust: r0(h.gust),
       windSpread: r1(h.windSpread), dir: r0(h.dir), cloud: r0(h.cloud), rh: r0(h.rh), pressure: r0(h.pressure),
       code: h.code, isDay: h.isDay, confidence: h.confidence, n: h.n,
+      ...(mountain ? { freezing: h.freezing ?? null, rainSnow: h.rainSnow ?? null } : {}),
     })),
     days: days.map((d) => ({ ...d, min: r1(d.min), max: r1(d.max), precip: r1(d.precip), pop: r0(d.pop * 100), wind: r0(d.wind), gust: r0(d.gust), dir: r0(d.dir) })),
     marine: seaHours,
-    activities: buildActivities(hours, seaHours, config.shoreFacing ?? 180),
+    activities: buildActivities(hours, seaHours, config.shoreFacing ?? 180, coastal, mountainActivityOptions(mountain)),
+    // Bulletin de montagne résumé (sans le détail horaire, déjà repris dans les heures).
+    mountain: mountain ? {
+      altitude: mountain.altitude, summit: mountain.summit, relief: mountain.relief, massif: mountain.massif, bulletin: mountain.bulletin,
+      days: mountainDays(mountain, days.map((d) => d.date)),
+    } : null,
     models,
     scores,
     errors,
@@ -161,7 +174,8 @@ export function buildWidget(fc) {
     // 48 prochaines heures : le widget s'en sert pour se recaler sur l'heure actuelle et pour les alertes.
     chart: fc.hours.slice(0, 48).map((h) => ({ t: h.time, h: +h.time.slice(11, 13), code: h.code, isDay: h.isDay, temp: r1(h.temp), feels: r1(h.feels), wind: h.wind, gust: h.gust, dir: h.dir, pop: h.pop ?? 0, precip: h.precip ?? 0 })),
     alerts: fc.alerts || [],
-    sessions: (fc.activities || []).filter((a) => a.windows.length).map((a) => {
+    // Le vélo reste dans l'appli : le widget n'affiche que les créneaux qu'il connaît.
+    sessions: (fc.activities || []).filter((a) => a.windows.length && a.id !== 'velo').map((a) => {
       const w = a.windows.find((x) => x.end >= fc.now.slice(0, 13) + ':00') || a.windows[0];
       return { id: a.id, emoji: a.emoji, label: a.label, when: whenLabel(w), score: w.score, wind: w.wind, gust: w.gust, dir: w.dir };
     }),

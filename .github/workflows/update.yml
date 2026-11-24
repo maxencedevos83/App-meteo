@@ -42,6 +42,9 @@ jobs:
           fi
 
       - name: Calculer la prévision combinée
+        env:
+          # Facultatif : clé gratuite du portail des API Météo-France (bulletins neige et avalanche complets).
+          METEOFRANCE_API_KEY: ${{ secrets.METEOFRANCE_API_KEY }}
         run: |
           node scripts/update.mjs
           head -c 1500 out/data/widget.json

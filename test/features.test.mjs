@@ -43,7 +43,7 @@ test('meilleurs créneaux : heures de jour consécutives', () => {
 test('alertes : pluie dans l\'heure, coup de vent, vigilance, créneau', () => {
   const hours = Array.from({ length: 24 }, (_, i) => H({ time: new Date(Date.parse('2026-10-26T10:00:00Z') + i * 3600000).toISOString().slice(0, 16), gust: i === 3 ? 38 : i < 5 ? 20 : 8, wind: i < 5 ? 18 : 5 }));
   const fc = { now: '2026-10-26T10:05', hours, rain: { text: 'Pluie vers 10h30', slots: [{ time: '2026-10-26T10:00', precip: 0 }, { time: '2026-10-26T10:15', precip: 0 }, { time: '2026-10-26T10:30', precip: 0.5 }] } };
-  fc.activities = buildActivities(hours, [], 150);
+  fc.activities = buildActivities(hours, [], 150, true);
   const alerts = buildAlerts(fc, { gustKn: 30, vigilance: [{ type: 'Vent', level: 3, color: 'orange', onset: '2026-10-26T08:00:00+00:00', headline: 'Vent violent' }] });
   const types = alerts.map((a) => a.type);
   assert.deepEqual(types.slice(0, 3), ['vigilance', 'pluie', 'vent']);
@@ -170,4 +170,89 @@ test('vigilance : même phénomène sur deux périodes = une seule alerte', () =
   const fc = { now: '2026-11-13T08:00', hours: [], days: [], activities: [] };
   const twice = [v[0], { ...v[0], onset: 'x' }];
   assert.equal(buildAlerts(fc, { vigilance: twice }).filter((a) => a.type === 'vigilance').length, 1);
+});
+
+// Conseils de sortie : les heures arrivent comme dans la prévision combinée (pop entre 0 et 1, vent en nœuds, pluie en mm/h).
+const day = (date, f) => Array.from({ length: 24 }, (_, i) => H({ time: `${date}T${String(i).padStart(2, '0')}:00`, isDay: i >= 7 && i < 18, temp: 15, ...f(i) }));
+const actOf = (acts, id) => acts.find((a) => a.id === id);
+
+test('sorties : 55 mm de pluie et vent fort, ni balade ni vélo ni bateau conseillés', () => {
+  // Épisode pluvieux : 55 mm sur la journée, rafales à 60-75 km/h, même entre deux averses.
+  const rain = [0, 0, 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 0.4, 0, 0, 1, 3, 4, 3, 2, 1, 0.6, 0, 0];
+  const hours = day('2026-11-24', (i) => ({ precip: rain[i], pop: rain[i] > 0 ? 0.9 : 0.5, wind: 22, gust: 36, cloud: 100, code: rain[i] >= 2 ? 63 : 61 }));
+  assert.ok(Math.round(rain.reduce((a, b) => a + b, 0)) >= 50);
+  const acts = buildActivities(hours, [], 150, true);
+  for (const id of ['balade', 'velo', 'bateau', 'baignade']) {
+    const a = actOf(acts, id);
+    assert.equal(a.windows.length, 0, `${id} conseillé malgré la pluie`);
+    assert.ok(Math.max(...a.scores) < 20, `${id} : score ${Math.max(...a.scores)}`);
+  }
+  assert.ok(actOf(acts, 'velo').why.includes('pluie'));
+});
+
+test('sorties : la probabilité de pluie (0 à 1) et la quantité comptent vraiment', () => {
+  const dry = scoreHour('velo', H({ wind: 5, gust: 8, temp: 18 }), null, 150).score;
+  const likely = scoreHour('velo', H({ wind: 5, gust: 8, temp: 18, pop: 0.8, precip: 0.3 }), null, 150);
+  const pouring = scoreHour('balade', H({ wind: 5, gust: 8, temp: 18, pop: 0.9, precip: 3 }), null, 150);
+  assert.ok(dry >= 85, `sec ${dry}`);
+  assert.ok(likely.score < 30 && likely.notes.includes('pluie'), `pluie probable ${likely.score}`);
+  assert.equal(pouring.score, 0);
+  // Même valeur exprimée en % : même résultat.
+  assert.equal(scoreHour('velo', H({ wind: 5, gust: 8, temp: 18, pop: 80, precip: 0.3 }), null, 150).score, likely.score);
+});
+
+test('sorties : vélo sensible au vent, balade plus tolérante', () => {
+  // Vent 30 km/h (16 nœuds), rafales 50 km/h (27 nœuds).
+  const velo = scoreHour('velo', H({ wind: 16, gust: 27, temp: 18 }), null, 150);
+  const balade = scoreHour('balade', H({ wind: 16, gust: 27, temp: 18 }), null, 150);
+  assert.ok(velo.score < 30 && velo.notes.includes('vent fort'), `vélo ${velo.score}`);
+  assert.ok(balade.score >= 50, `balade ${balade.score}`);
+  // Coup de vent (rafales 80 km/h) : balade déconseillée aussi.
+  assert.ok(scoreHour('balade', H({ wind: 25, gust: 43, temp: 18 }), null, 150).score < 10);
+});
+
+test('sorties : une averse dans l\'heure qui suit ou juste avant compte', () => {
+  const hours = day('2026-11-25', (i) => ({ wind: 5, gust: 8, temp: 18, precip: i === 11 ? 3 : 0, pop: i === 11 ? 0.9 : 0.05 }));
+  const acts = buildActivities(hours, [], 150, true);
+  const v = actOf(acts, 'velo');
+  assert.ok(v.scores[10] < 20, `averse à 11h : 10h vaut ${v.scores[10]}`);
+  assert.ok(v.scores[12] < v.scores[15], 'routes mouillées juste après');
+  assert.ok(v.scores[15] >= 80, `après-midi sec ${v.scores[15]}`);
+  assert.ok(v.windows.some((w) => w.start >= '2026-11-25T13:00'));
+});
+
+test('sorties : beau temps calme, tout est conseillé de jour', () => {
+  const hours = day('2026-11-26', () => ({ wind: 5, gust: 9, temp: 19, precip: 0, pop: 0.05, cloud: 10 }));
+  const acts = buildActivities(hours, [], 150, true);
+  for (const id of ['balade', 'velo', 'bateau']) assert.ok(actOf(acts, id).windows.length >= 1, id);
+  assert.deepEqual(actOf(acts, 'velo').why, []);
+});
+
+test('sorties : loin de la mer, ni bateau ni baignade', () => {
+  const hours = day('2026-07-10', () => ({ wind: 4, gust: 7, temp: 28, precip: 0, pop: 0, cloud: 0 }));
+  // Ville de l'intérieur : pas de données de mer.
+  const inland = buildActivities(hours, null, 180).map((a) => a.id);
+  assert.deepEqual(inland, ['balade', 'velo']);
+  // Données de mer vides (le modèle de vagues ne couvre pas la terre) : pareil.
+  const empty = hours.map((h) => ({ time: h.time, wave: null, sst: null }));
+  assert.deepEqual(buildActivities(hours, empty, 180).map((a) => a.id), ['balade', 'velo']);
+  // Au bord de la mer : les quatre.
+  const sea = hours.map((h) => ({ time: h.time, wave: 0.3, sst: 24 }));
+  assert.deepEqual(buildActivities(hours, sea, 150).map((a) => a.id), ['bateau', 'baignade', 'balade', 'velo']);
+  // Lieu déclaré au bord de la mer (config) : bateau gardé même si l'API de la mer est en panne.
+  assert.ok(buildActivities(hours, null, 150, true).some((a) => a.id === 'bateau'));
+});
+
+test('mer : pas d\'état de la mer pour une ville de l\'intérieur', async () => {
+  const { fetchMarine } = await import('../web/js/sources.js');
+  const times = ['2026-07-10T10:00', '2026-07-10T11:00'];
+  const reply = (json) => async () => ({ ok: true, json: async () => json });
+  // Bourges : le modèle de vagues renvoie des valeurs vides.
+  assert.equal(await fetchMarine(47.08, 2.4, 'Europe/Paris', reply({ latitude: 47.08, longitude: 2.4, hourly: { time: times, wave_height: [null, null], sea_surface_temperature: [null, null] } })), null);
+  // Maille marine retenue à plus de 25 km du lieu : pas au bord de la mer non plus.
+  assert.equal(await fetchMarine(43.6, 6.4, 'Europe/Paris', reply({ latitude: 43.1, longitude: 6.4, hourly: { time: times, wave_height: [0.4, 0.5] } })), null);
+  // Le Lavandou : valeurs présentes, maille toute proche.
+  const sea = await fetchMarine(43.1375, 6.3683, 'Europe/Paris', reply({ latitude: 43.125, longitude: 6.375, hourly: { time: times, wave_height: [0.4, 0.5], sea_surface_temperature: [17, 17] } }));
+  assert.equal(sea.length, 2);
+  assert.equal(sea[0].wave, 0.4);
 });

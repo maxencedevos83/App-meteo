@@ -1,6 +1,7 @@
 // Alertes affichées dans l'appli et envoyées en notification par le widget Android.
 // Chaque alerte a un identifiant stable : le téléphone ne notifie qu'une fois la même alerte.
 import { kmh } from './ensemble.js';
+import { mountainAlerts } from './mountain.js';
 
 const kn2kmh = (v) => Math.round(kmh(v));
 const hhmm = (t) => `${+t.slice(11, 13)}h${t.slice(14, 16) === '00' ? '' : t.slice(14, 16)}`;
@@ -23,6 +24,9 @@ export function buildAlerts(fc, { gustKn = 30, vigilance = [], sessionMin = 75 }
     alerts.push({ id: `vig-${v.type}-${v.level}-${v.onset}`, type: 'vigilance', level: v.level, title: `Vigilance ${v.color} ${v.type.toLowerCase()}`, text: v.headline || `Du ${v.onsetLabel} au ${v.expiresLabel}`, until: v.expires });
   }
 
+  // Montagne : risque d'avalanche du bulletin Météo-France, neige abondante, tempête sur les crêtes.
+  alerts.push(...mountainAlerts(fc));
+
   // Pluie dans l'heure (créneaux de 15 min).
   const slots = fc.rain?.slots || [];
   const firstWet = slots.find((s) => (s.precip ?? 0) >= 0.1);
@@ -43,7 +47,7 @@ export function buildAlerts(fc, { gustKn = 30, vigilance = [], sessionMin = 75 }
 
   // Bons créneaux de sortie aujourd'hui et demain.
   for (const a of fc.activities || []) {
-    if (a.id === 'balade' || a.id === 'baignade') continue;
+    if (a.id !== 'bateau') continue; // notification seulement pour la sortie bateau
     const w = a.windows.find((x) => x.score >= sessionMin && ['aujourd\'hui', 'demain'].includes(dayWord(x.start, now)) && x.end >= now.slice(0, 13) + ':00');
     if (w) alerts.push({ id: `session-${a.id}-${w.start}`, type: 'session', level: 0, title: `${a.emoji} ${a.label} : bon créneau ${dayWord(w.start, now)}`, text: `${hhmm(w.start)} à ${+w.end.slice(11, 13) + 1}h · ${kn2kmh(w.wind)} km/h ${w.dir} (raf. ${kn2kmh(w.gust)})` });
   }

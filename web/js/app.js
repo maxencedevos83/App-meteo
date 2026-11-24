@@ -1,4 +1,4 @@
-import { codeEmoji, codeLabel, dirLabel, kmh, KMH } from './ensemble.js';
+import { codeEmoji, codeLabel, dirLabel, kmh, KMH, localKey } from './ensemble.js';
 import { fetchAllOpenMeteo, fetchEnsemblePop, fetchNowcast, fetchMarine, fetchAgri, geocode, reverseGeocode, distanceKm } from './sources.js';
 import { buildForecast, freshen } from './forecast.js';
 import { skyDay } from './astro.js';
@@ -6,6 +6,7 @@ import { buildAlerts, dayWord } from './alerts.js';
 import { startScene, skyKind } from './scene.js';
 import { beachFlag } from './activities.js';
 import { dayPeriods, threeHourly, dayText } from './daydetail.js';
+import { fetchElevations, ringPoints, detectMountain, fetchMountainHourly, buildMountain, mountainLinks, DANGER } from './mountain.js';
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -34,17 +35,29 @@ async function loadHome(path = 'data/') {
   return res.json();
 }
 
+// Lieu montagneux ? Relief des environs ; si oui, grandeurs d'altitude et bulletin du massif (data/montagne.json).
+async function loadMountain(lat, lon, tz) {
+  const elev = await fetchElevations(ringPoints(lat, lon));
+  if (!detectMountain(elev[0], elev.slice(1)).mountain) return null;
+  const [hourly, bulletins] = await Promise.all([
+    fetchMountainHourly(lat, lon, tz).catch(() => null),
+    fetch(`data/montagne.json?t=${Date.now()}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+  ]);
+  return buildMountain({ latitude: lat, longitude: lon, altitude: elev[0], ring: elev.slice(1), hourly, bulletins, nowKey: localKey(new Date(), tz) });
+}
+
 // Calcul dans le navigateur pour un autre lieu (sans Windguru ni vérification locale).
 async function loadPlace(place) {
   const { latitude: lat, longitude: lon, timezone: tz } = place;
-  const [om, pop, nowcast, marine] = await Promise.all([
+  const [om, pop, nowcast, marine, mountain] = await Promise.all([
     fetchAllOpenMeteo(lat, lon, tz),
     fetchEnsemblePop(lat, lon, tz).catch(() => ({})),
     fetchNowcast(lat, lon, tz).catch(() => null),
     fetchMarine(lat, lon, tz).catch(() => null),
+    loadMountain(lat, lon, tz).catch(() => null),
   ]);
   if (!om.sources.length) throw new Error('aucun modèle disponible pour ce lieu');
-  const fc = buildForecast({ config: { place: place.name, latitude: lat, longitude: lon, timezone: tz }, sources: om.sources, ensemblePop: pop, nowcast, marine, errors: om.errors });
+  const fc = buildForecast({ config: { place: place.name, latitude: lat, longitude: lon, timezone: tz }, sources: om.sources, ensemblePop: pop, nowcast, marine, mountain, errors: om.errors });
   fc.local = true;
   fc.alerts = buildAlerts(fc);
   return fc;
@@ -140,6 +153,7 @@ function render(fc) {
   $('#updated').textContent = age < 1 ? 'à l\'instant' : age < 60 ? `il y a ${age} min` : `il y a ${Math.round(age / 60)} h`;
   renderAlerts(fc.alerts || []);
   renderHero(fc);
+  renderMountain(fc);
   renderHourly(fc.hours.slice(0, 48));
   renderWind(fc.hours.slice(0, 30));
   renderSessions(fc);
@@ -151,6 +165,9 @@ function render(fc) {
   renderHistory(fc);
   renderSources(fc);
   radar.center(fc.latitude, fc.longitude);
+  // Loin de la mer, pas d'onglet vagues.
+  $('#tab-waves').hidden = fc.coastal === false;
+  if (fc.coastal === false && radar.kind === 'waves') radar.tab('rain');
   window.MeteoApp?.ready?.(fc.place, fc.days.length);
 }
 
@@ -395,7 +412,7 @@ function renderLinks(fc) {
   const lat = fc.latitude.toFixed(3), lon = fc.longitude.toFixed(3);
   const spain = fc.timezone === 'Europe/Madrid';
   const groups = [
-    ['🌊 Mer', [
+    fc.coastal !== false && ['🌊 Mer', [
       spain
         ? ['Bulletin maritime AEMET', 'https://www.aemet.es/es/eltiempo/prediccion/maritima']
         : ['Météo marine Météo-France (bulletins côtiers)', 'https://meteofrance.com/meteo-marine'],
@@ -403,6 +420,7 @@ function renderLinks(fc) {
       fc.windguru?.spotId && [`Windguru${fc.windguru.spotName ? ` – ${fc.windguru.spotName}` : ''}`, `https://www.windguru.cz/${fc.windguru.spotId}`],
       ['Vagues et houle (Windy)', `https://www.windy.com/?waves,${lat},${lon},9`],
     ]],
+    fc.mountain && ['⛰️ Montagne', mountainLinks(fc)],
     ['🌧 Radars', [
       spain ? ['Radar Meteocat (Catalogne)', 'https://www.meteo.cat/observacions/radar'] : ['Pluie en direct (Météo-France)', 'https://meteofrance.com/images-radar'],
       spain && ['Radar AEMET', 'https://www.aemet.es/es/eltiempo/observacion/radar'],
@@ -414,7 +432,7 @@ function renderLinks(fc) {
     ]],
   ];
   const note = '<p class="explain">Ensoleillement, évapotranspiration, UV et humidité du sol sont aussi dans le détail de chaque jour (10 jours).</p>';
-  $('#links').innerHTML = groups.map(([title, items]) => `<div class="link-group"><h3 class="sub">${title}</h3>
+  $('#links').innerHTML = groups.filter(Boolean).map(([title, items]) => `<div class="link-group"><h3 class="sub">${title}</h3>
     ${items.filter(Boolean).map(([label, url]) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(label)} ↗</a>`).join('')}</div>`).join('') + note;
 }
 
@@ -435,12 +453,12 @@ function renderSessions(fc) {
   $('#sessions-card').hidden = !acts.length;
   $('#sessions').innerHTML = acts.map((a) => {
     const wins = a.windows.map((w) => `<span class="win ${w.score < 75 ? 'mid' : ''}">${dayWord(w.start, fc.now)} ${+w.start.slice(11, 13)}h–${+w.end.slice(11, 13) + 1}h
-      <small>· ${a.id === 'baignade' || a.id === 'balade' ? `${w.score}/100` : `${r0(kmh(w.wind))} km/h ${w.dir}`}${w.notes.length ? ` · ${esc(w.notes.join(', '))}` : ''}</small></span>`).join('');
+      <small>· ${a.id === 'baignade' || a.id === 'balade' ? `${w.score}/100` : a.id === 'velo' ? `${w.score}/100 · ${r0(kmh(w.wind))} km/h ${w.dir}` : `${r0(kmh(w.wind))} km/h ${w.dir}`}${w.notes.length ? ` · ${esc(w.notes.join(', '))}` : ''}</small></span>`).join('');
     // Bandeau 5 jours : une case par heure, couleur selon le score.
     const strip = a.scores.slice(0, 120).map((sc, i) => `<i style="background:${scoreColor(sc)}" title="${fc.hours[i]?.time.slice(5, 13).replace('T', ' ')}h : ${sc}"></i>`).join('');
     return `<div class="act"><div class="ico">${a.emoji}</div><div class="name">${a.label}</div>
       <div class="strip">${strip}</div>
-      <div class="wins">${wins || '<span class="none">Pas de bon créneau dans les 5 jours</span>'}</div></div>`;
+      <div class="wins">${wins || `<span class="none">Pas de bon créneau dans les 5 jours${a.why?.length ? ` (${esc(a.why.join(', '))})` : ''}</span>`}</div></div>`;
   }).join('');
 }
 
@@ -465,11 +483,54 @@ function renderModels(fc) {
 
 function renderFlag(fc) {
   const f = beachFlag(fc.hours[0], fc.marine?.[0], fc.shoreFacing);
-  $('#flag').hidden = !f || !fc.marine?.length;
+  $('#flag').hidden = !f || !fc.marine?.length || fc.coastal === false;
   if (!f) return;
   $('#flag').className = `flag f${f.level}`;
   $('#flag').innerHTML = `<i></i><div><b>Drapeau estimé : ${f.color}</b> · ${f.label}${f.why.length ? ` (${esc(f.why.join(', '))})` : ''}
     <small>Estimation d'après la mer et le vent, pas le drapeau officiel des sauveteurs.</small></div>`;
+}
+
+// Bulletin montagne : risque d'avalanche du massif, isotherme 0 °C, limite pluie-neige, neige, vent en altitude.
+function renderMountain(fc) {
+  const m = fc.mountain;
+  $('#mountain-card').hidden = !m;
+  if (!m) return;
+  const today = fc.now.slice(0, 10);
+  const days = (m.days || []).filter((d) => d.date >= today).slice(0, 5);
+  const d0 = days[0] || {};
+  const b = m.bulletin;
+  const alt = (v) => (v == null ? '–' : `${Math.round(v).toLocaleString('fr-FR')} m`);
+  const wind = (v, dir) => (v == null ? '–' : `${arrow(dir)} ${r0(kmh(v))}`);
+  $('#mountain-hint').textContent = `${alt(m.altitude)}${m.massif ? ` · massif ${m.massif.name}` : ''}`;
+  let danger;
+  if (b?.danger) {
+    const d = DANGER[b.danger];
+    const split = b.high && b.low && b.high !== b.low && b.altitude ? `${b.high} au-dessus de ${alt(b.altitude)}, ${b.low} en dessous · ` : '';
+    const when = b.date ? `${+b.date.slice(8, 10)}/${+b.date.slice(5, 7)}` : '';
+    danger = `<div class="aval"><b class="lvl${b.danger >= 5 ? ' l5' : ''}" style="background:${d.color}">${b.danger}</b><div>
+      <b>Risque d'avalanche ${d.label}</b> · ${esc(m.massif?.name || '')}
+      <small>${split}bulletin ${when ? `du ${when} ` : ''}(${esc(b.source || 'Météo-France')})</small></div></div>
+      ${b.summary ? `<p class="explain">${esc(b.summary)}</p>` : ''}`;
+  } else {
+    danger = `<div class="aval none"><b class="lvl">–</b><div><b>Pas de bulletin d'avalanche en cours</b>
+      <small>${m.massif ? `Météo-France publie celui du massif ${esc(m.massif.name)} en saison, de décembre à avril environ.` : 'Lieu hors des massifs suivis par Météo-France : voir la carte européenne dans « Bulletins et radars ».'}</small></div></div>`;
+  }
+  $('#mountain').innerHTML = `${danger}
+    <div class="mtn-stats">
+      <div class="stat"><small>Isotherme 0 °C</small><b>${alt(d0.freezing)}</b><small>${d0.freezingMin != null ? `${alt(d0.freezingMin)} à ${alt(d0.freezingMax)}` : ''}</small></div>
+      <div class="stat"><small>Pluie-neige</small><b>${alt(d0.rainSnow)}</b><small>${d0.rainSnow != null ? (d0.rainSnow <= m.altitude ? 'neige jusqu\'ici' : 'pluie ici') : ''}</small></div>
+      <div class="stat"><small>Neige au sol</small><b>${d0.snowDepth == null ? '–' : `${d0.snowDepth} cm`}</b><small>${d0.snowfall ? `+${r0(d0.snowfall)} cm aujourd'hui` : 'pas de chute prévue'}</small></div>
+    </div>
+    ${days.length ? `<div class="wind-table"><table>
+      <tr><th></th>${days.map((d) => `<td><b>${d.date === today ? 'Auj.' : FR_DAYS[new Date(d.date + 'T12:00Z').getUTCDay()]}</b></td>`).join('')}</tr>
+      <tr><th>Iso 0 °C</th>${days.map((d) => `<td>${alt(d.freezing)}</td>`).join('')}</tr>
+      <tr><th>Pluie-neige</th>${days.map((d) => `<td>${alt(d.rainSnow)}</td>`).join('')}</tr>
+      <tr><th>Neige cm</th>${days.map((d) => `<td class="${d.snowfall >= 1 ? 'wet' : ''}">${d.snowfall >= 0.5 ? r0(d.snowfall) : '–'}</td>`).join('')}</tr>
+      <tr><th>Vent 1 500 m</th>${days.map((d) => `<td>${wind(d.wind1500, d.dir1500)}</td>`).join('')}</tr>
+      <tr><th>Vent 3 000 m</th>${days.map((d) => `<td>${wind(d.wind3000, d.dir3000)}</td>`).join('')}</tr>
+      <tr><th>Temp. 3 000 m</th>${days.map((d) => `<td>${d.temp3000 == null ? '–' : `${d.temp3000}°`}</td>`).join('')}</tr>
+    </table></div>` : ''}
+    <p class="explain">Vent en km/h, maximum de la journée. Pluie ou neige est décidée heure par heure d'après la limite pluie-neige${b?.meteo?.length ? ' du bulletin Météo-France' : ' (isotherme 0 °C moins 300 m)'} et l'altitude du lieu. En montagne, les modèles à maille fine (AROME) comptent davantage.</p>`;
 }
 
 function renderSea(marine) {
