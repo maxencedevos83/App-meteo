@@ -64,7 +64,8 @@ export function hourContext(hours, i, dayRain = null) {
 // h : heure combinée ; sea : état de la mer à la même heure ; shoreFacing : orientation de la plage (°) ;
 // ctx : contexte des heures voisines (hourContext). Sans ctx, seule l'heure elle-même compte.
 export function scoreHour(id, h, sea, shoreFacing, ctx = null) {
-  const r = RULES[id];
+  // ctx.rules : tolérances propres au lieu (en montagne, on randonne équipé par 0 °C).
+  const r = RULES[id] && ctx?.rules?.[id] ? { ...RULES[id], ...ctx.rules[id] } : RULES[id];
   if (!r) return { score: 0, notes: [] };
   const wind = h.wind ?? 0;
   const gust = Math.max(h.gust ?? wind, ctx?.gustAhead ?? 0);
@@ -153,16 +154,22 @@ export function bestWindows(hours, scores, { min = 60, minLength = 2, max = 4 } 
 export const hasSeaData = (marine) => !!marine?.some((m) => isNum(m.wave) || isNum(m.sst));
 
 // coastal : null = déduit des données de mer.
-export function buildActivities(hours, marine, shoreFacing = 180, coastal = null) {
+// opts (montagne, voir mountain.js) : relabel { id: { label, emoji } }, extra : activités en plus, rules : tolérances,
+// rescore(id, heure, { score, notes }) → { score, notes } pour corriger le score d'une heure.
+export function buildActivities(hours, marine, shoreFacing = 180, coastal = null, opts = {}) {
   const atSea = coastal ?? hasSeaData(marine);
   const seaAt = new Map((marine || []).map((m) => [m.time, m]));
   const span = hours.slice(0, 120);
   // Cumul de pluie par jour (sur les heures connues) : 55 mm dans la journée ne laissent pas de vraie fenêtre sèche.
   const dayRain = new Map();
   for (const h of hours) dayRain.set(h.time.slice(0, 10), (dayRain.get(h.time.slice(0, 10)) ?? 0) + (h.precip ?? 0));
-  const ctx = span.map((h, i) => hourContext(hours, i, dayRain.get(h.time.slice(0, 10))));
-  return ACTIVITIES.filter((a) => atSea || !a.sea).map((a) => {
-    const rows = span.map((h, i) => scoreHour(a.id, h, seaAt.get(h.time), shoreFacing, ctx[i]));
+  const ctx = span.map((h, i) => ({ ...hourContext(hours, i, dayRain.get(h.time.slice(0, 10))), rules: opts.rules }));
+  const list = [...ACTIVITIES, ...(opts.extra || [])].map((a) => ({ ...a, ...opts.relabel?.[a.id] }));
+  return list.filter((a) => atSea || !a.sea).map((a) => {
+    const rows = span.map((h, i) => {
+      const row = scoreHour(a.id, h, seaAt.get(h.time), shoreFacing, ctx[i]);
+      return opts.rescore ? opts.rescore(a.id, h, row) : row;
+    });
     const scores = rows.map((r) => r.score);
     const windows = bestWindows(span, scores).map((w) => {
       const slice = span.slice(w.i0, w.i0 + w.hours);
