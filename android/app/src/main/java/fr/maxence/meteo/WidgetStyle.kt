@@ -110,8 +110,9 @@ object WidgetStyle {
         fun walk(view: View) {
             if (view is TextView && view.id != View.NO_ID) {
                 val name = app.resources.getResourceEntryName(view.id)
-                // Les pastilles de vent (texte foncé sur couleur) et le bandeau d'alerte gardent leurs couleurs.
-                val fixed = name == "alert" || name == "icon" || Regex("[hd]\\d_(wind|icon)").matches(name)
+                // Les pastilles de vent (texte foncé sur couleur), le risque de pluie (bleu) et le bandeau d'alerte
+                // gardent leurs couleurs.
+                val fixed = name == "alert" || Regex("[ab]\\d_(wind|icon|pop)").matches(name)
                 out.add(TextInfo(view.id, view.textSize, Color.alpha(view.currentTextColor), !fixed))
             }
             if (view is ViewGroup) for (i in 0 until view.childCount) walk(view.getChildAt(i))

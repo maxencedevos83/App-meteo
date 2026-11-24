@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ciel du widget : mêmes couleurs que l'appli (web/css/app.css, data-sky), lueur en haut à droite. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient android:angle="270" android:startColor="#1b1f52" android:centerColor="#0f1236" android:centerY="0.45" android:endColor="#070919" />
+            <corners android:radius="@dimen/widget_radius" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient android:type="radial" android:centerX="0.85" android:centerY="0" android:gradientRadius="110%" android:startColor="#388C82FF" android:endColor="#00FFFFFF" />
+            <corners android:radius="@dimen/widget_radius" />
+        </shape>
+    </item>
+</layer-list>
